@@ -1,0 +1,20 @@
+/* CSS In ấn chuẩn A4/A5/A6 */
+.a4-sheet { width: 210mm; min-height: 297mm; padding: 14mm 16mm; margin: 0 auto; background: #ffffff; box-shadow: 0 12px 30px -5px rgba(0, 0, 0, 0.18); color: #000000; box-sizing: border-box; }
+.a5-landscape-sheet { width: 210mm; min-height: 148.5mm; padding: 8mm 12mm; margin: 0 auto; background: #ffffff; box-shadow: 0 12px 30px -5px rgba(0, 0, 0, 0.18); color: #000000; box-sizing: border-box; }
+.a5-portrait-sheet { width: 148.5mm; min-height: 210mm; padding: 7mm 8mm; margin: 0 auto; background: #ffffff; box-shadow: 0 12px 30px -5px rgba(0, 0, 0, 0.18); color: #000000; box-sizing: border-box; }
+.a6-portrait-sheet { width: 105mm; min-height: 148.5mm; padding: 5mm 6mm; margin: 0 auto; background: #ffffff; box-shadow: 0 12px 30px -5px rgba(0, 0, 0, 0.18); color: #000000; box-sizing: border-box; }
+.a4-container { overflow-x: auto; -webkit-overflow-scrolling: touch; display: flex; justify-content: center; align-items: flex-start; min-height: 100%; }
+
+@page { size: A4 portrait; margin: 0; }
+@media print {
+  body { background: #ffffff !important; padding: 0 !important; margin: 0 !important; }
+  .no-print, header, #mobile-nav, #toast-container, .modal-backdrop { display: none !important; }
+  #section-form { display: none !important; }
+  #section-preview { display: block !important; width: 100% !important; margin: 0 !important; padding: 0 !important; }
+  .a4-container { padding: 0 !important; background: transparent !important; border: none !important; overflow: visible !important; }
+  #zoomWrapper { transform: none !important; width: 100% !important; }
+  .a4-sheet { width: 210mm !important; min-height: auto !important; margin: 0 !important; padding: 12mm 15mm !important; box-shadow: none !important; border: none !important; }
+  .a5-landscape-sheet { width: 210mm !important; min-height: auto !important; margin: 0 !important; padding: 7mm 11mm !important; box-shadow: none !important; border: none !important; }
+  .a5-portrait-sheet { width: 148.5mm !important; min-height: auto !important; margin: 0 !important; padding: 6mm 7mm !important; box-shadow: none !important; border: none !important; }
+  .a6-portrait-sheet { width: 105mm !important; min-height: auto !important; margin: 0 !important; padding: 4mm 5mm !important; box-shadow: none !important; border: none !important; }
+}

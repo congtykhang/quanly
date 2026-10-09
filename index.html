@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>DocuGen Pro - Hệ Thống Quản Lý Đơn Hàng CÔNG TY TNHH PHẠM DUY KHANG</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Tinos:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" crossorigin="anonymous"></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: { fontFamily: { sans: ['Inter', 'sans-serif'], document: ['"Tinos"', '"Times New Roman"', 'Times', 'serif'] } } }
+    }
+  </script>
+  <!-- Link tới file CSS bên ngoài -->
+  <link rel="stylesheet" href="css/style.css">
+  <style id="dynamicPagePrintStyle">@page { size: A4 portrait; margin: 0; }</style>
+</head>
+<body class="bg-slate-100 flex flex-col min-h-screen text-slate-800 font-sans">
+
+  <!-- MÀN HÌNH ĐĂNG NHẬP -->
+  <div id="authOverlay" class="fixed inset-0 bg-slate-900 z-[9999] flex flex-col items-center justify-center p-4">
+    <div class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md border-t-4 border-blue-600 relative overflow-hidden">
+      <div id="authLoadingOverlay" class="absolute inset-0 bg-white/90 backdrop-blur-sm z-20 flex flex-col items-center justify-center hidden">
+        <i class="fa-solid fa-circle-notch fa-spin text-4xl text-blue-600 mb-3"></i>
+        <p class="text-sm font-bold text-slate-700 animate-pulse mt-2">Đang xử lý...</p>
+      </div>
+      <div class="text-center mb-6">
+        <div class="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl">
+          <i class="fa-solid fa-shield-halved"></i>
+        </div>
+        <h2 class="text-2xl font-extrabold text-slate-900">DocuGen Pro</h2>
+        <p class="text-sm text-slate-500 mt-1 font-medium">Hệ thống Quản lý CTY TNHH PHẠM DUY KHANG</p>
+      </div>
+
+      <!-- Khung Đăng ký Admin -->
+      <div id="setupAdminBox" class="hidden">
+        <div class="bg-amber-50 border border-amber-200 text-amber-800 text-xs p-3 rounded-lg mb-4 flex gap-2">
+          <i class="fa-solid fa-triangle-exclamation mt-0.5"></i>
+          <span>Hệ thống trống. Vui lòng tạo tài khoản <strong>Admin</strong> đầu tiên.</span>
+        </div>
+        <form id="formSetupAdmin" class="space-y-4">
+          <div><label class="block text-xs font-bold text-slate-700 mb-1">Họ và tên người dùng (Admin)</label><input type="text" id="regAdminFullName" required placeholder="VD: Nguyễn Văn A" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"></div>
+          <div><label class="block text-xs font-bold text-slate-700 mb-1">Tên đăng nhập Admin</label><input type="text" id="regAdminUser" required placeholder="admin" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none font-semibold"></div>
+          <div><label class="block text-xs font-bold text-slate-700 mb-1">Mật khẩu</label><input type="password" id="regAdminPass" required placeholder="••••••••" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"></div>
+          <button type="submit" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md transition flex justify-center items-center gap-2"><i class="fa-solid fa-user-shield"></i> Khởi tạo Hệ thống</button>
+        </form>
+      </div>
+
+      <!-- Khung Đăng nhập -->
+      <div id="loginBox" class="hidden">
+        <form id="formLogin" class="space-y-4">
+          <div><label class="block text-xs font-bold text-slate-700 mb-1">Tên đăng nhập</label><div class="relative"><i class="fa-solid fa-user absolute left-3 top-3.5 text-slate-400"></i><input type="text" id="loginUser" required placeholder="Nhập tên đăng nhập..." class="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none font-semibold"></div></div>
+          <div><label class="block text-xs font-bold text-slate-700 mb-1">Mật khẩu</label><div class="relative"><i class="fa-solid fa-lock absolute left-3 top-3.5 text-slate-400"></i><input type="password" id="loginPass" required placeholder="••••••••" class="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"></div></div>
+          <div class="flex justify-end"><button type="button" onclick="window.showForgotPass()" class="text-xs font-bold text-blue-600 hover:text-blue-800">Quên mật khẩu?</button></div>
+          <button type="submit" id="btnLoginSubmit" class="w-full py-3 bg-slate-900 hover:bg-black text-white font-bold rounded-xl shadow-md transition mt-2">Đăng Nhập</button>
+        </form>
+      </div>
+
+      <!-- Khung Quên mật khẩu -->
+      <div id="forgotPassBox" class="hidden">
+        <div class="bg-indigo-50 border border-indigo-200 text-indigo-800 text-xs p-3 rounded-lg mb-4 flex gap-2"><i class="fa-solid fa-key mt-0.5"></i><span>Nhập <strong>Tên đăng nhập</strong> và <strong>Mã bí mật</strong> để đặt lại mật khẩu mới.</span></div>
+        <form id="formForgotPass" class="space-y-4">
+          <div><label class="block text-xs font-bold text-slate-700 mb-1">Tên đăng nhập cần khôi phục</label><input type="text" id="resetUser" required class="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:outline-none font-semibold"></div>
+          <div><label class="block text-xs font-bold text-slate-700 mb-1">Mã bí mật (Secret Code)</label><input type="password" id="resetSecret" required placeholder="Nhập mã bí mật..." class="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:outline-none"></div>
+          <div><label class="block text-xs font-bold text-slate-700 mb-1">Mật khẩu mới</label><input type="password" id="resetNewPass" required placeholder="••••••••" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:outline-none"></div>
+          <div class="flex gap-2 pt-2"><button type="button" onclick="window.hideForgotPass()" class="flex-1 py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl transition">Hủy</button><button type="submit" class="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md transition">Xác nhận Đổi</button></div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div id="mainApp" class="hidden flex-col min-h-screen">
+    <!-- HEADER -->
+    <header class="no-print bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-40 shadow-lg">
+      <div class="max-w-[1600px] mx-auto px-3 sm:px-6 py-2.5 flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+          <div class="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-lg font-bold shadow-sm"><i class="fa-solid fa-file-invoice"></i></div>
+          <div>
+            <h1 class="text-sm sm:text-base font-extrabold tracking-tight hidden sm:block">DocuGen Pro</h1>
+            <div class="text-[10px] text-slate-400 uppercase tracking-widest font-semibold flex items-center gap-1" id="cloudStatusContainer">
+              <i id="cloudStatusIcon" class="fa-solid fa-server text-slate-400"></i> <span id="cloudStatusText">Local Only</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex items-center space-x-1.5 sm:space-x-2 overflow-x-auto custom-scroll no-scrollbar py-1">
+          <div class="flex items-center gap-2 bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700 mr-2">
+            <i class="fa-solid fa-circle-user text-slate-300"></i>
+            <div class="flex flex-col">
+              <span id="uiCurrentUserName" class="text-xs font-bold text-white leading-tight">user</span>
+              <span id="uiCurrentUserRole" class="text-[9px] font-bold text-blue-400 uppercase tracking-wider">Role</span>
+            </div>
+          </div>
+
+          <button onclick="window.openEmployeeModal()" class="admin-only flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-bold border border-amber-500/30 transition">
+            <i class="fa-solid fa-users-gear"></i><span class="hidden sm:inline">Nhân sự</span>
+          </button>
+          
+          <button onclick="window.openSystemSettingsModal()" class="admin-only flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-medium border border-slate-600 transition">
+            <i class="fa-solid fa-gear text-slate-300"></i><span class="hidden sm:inline">Cài đặt</span>
+          </button>
+
+          <!-- NÚT KHÁCH HÀNG & ĐƠN HÀNG -->
+          <button onclick="window.openCustomerModal()" class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-medium border border-slate-600 transition">
+            <i class="fa-solid fa-address-book text-blue-400"></i><span class="hidden sm:inline">Khách hàng</span>
+          </button>
+          <button onclick="window.openOrderModal()" class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-medium border border-slate-600 transition">
+            <i class="fa-solid fa-folder-open text-amber-400"></i><span class="hidden sm:inline">Đơn hàng</span>
+          </button>
+
+          <button onclick="window.logoutApp()" class="flex items-center space-x-1 px-2.5 py-1.5 rounded-lg text-rose-400 hover:bg-rose-950/50 hover:text-rose-300 text-xs font-bold transition" title="Đăng xuất">
+            <i class="fa-solid fa-right-from-bracket"></i>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- THANH CHUYỂN ĐỔI 3 TAB -->
+    <div class="no-print bg-white border-b border-slate-200 shadow-xs">
+      <div class="max-w-[1600px] mx-auto px-3 sm:px-6 py-2.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
+        <div class="flex items-center space-x-2">
+          <span class="text-xs font-bold uppercase tracking-wider text-slate-500 hidden xl:inline-block mr-1">Tạo chứng từ:</span>
+          <div class="grid grid-cols-3 gap-1.5 sm:flex sm:space-x-2 w-full sm:w-auto bg-slate-100 p-1.5 rounded-xl border border-slate-200">
+            <button type="button" id="docTabBtn_quote" onclick="window.switchDocMode('quote')" class="px-3 sm:px-5 py-2 rounded-lg text-xs sm:text-sm font-bold transition flex items-center justify-center gap-1.5 bg-blue-600 text-white shadow-sm"><i class="fa-solid fa-file-invoice-dollar"></i><span>📋 Báo giá</span></button>
+            <button type="button" id="docTabBtn_order" onclick="window.switchDocMode('order')" class="px-3 sm:px-5 py-2 rounded-lg text-xs sm:text-sm font-bold transition flex items-center justify-center gap-1.5 text-slate-600 hover:text-slate-900 hover:bg-white/70"><i class="fa-solid fa-cart-shopping"></i><span>🛒 Đặt hàng</span></button>
+            <button type="button" id="docTabBtn_delivery" onclick="window.switchDocMode('delivery')" class="px-3 sm:px-5 py-2 rounded-lg text-xs sm:text-sm font-bold transition flex items-center justify-center gap-1.5 text-slate-600 hover:text-slate-900 hover:bg-white/70"><i class="fa-solid fa-truck-fast"></i><span>🚚 Giao hàng</span></button>
+          </div>
+        </div>
+        <!-- Chú thích tab chính -->
+        <div class="hidden sm:block text-[11px] text-slate-500 font-semibold italic bg-amber-50 px-3 py-1.5 rounded border border-amber-200">
+          *Báo giá là tab gốc. Thông tin KH chỉ được sửa tại tab Báo giá.
+        </div>
+      </div>
+    </div>
+
+    <!-- Thanh tab Mobile -->
+    <div id="mobile-nav" class="no-print lg:hidden bg-white border-b border-slate-200 sticky top-16 z-30 shadow-xs flex">
+      <button onclick="window.switchViewTab('form')" id="mobileTabFormBtn" class="flex-1 py-3 text-center text-xs sm:text-sm font-bold border-b-2 border-blue-600 text-blue-600 flex items-center justify-center space-x-1.5"><i class="fa-solid fa-pen-to-square"></i><span>1. Nhập liệu</span></button>
+      <button onclick="window.switchViewTab('preview')" id="mobileTabPreviewBtn" class="flex-1 py-3 text-center text-xs sm:text-sm font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-800 flex items-center justify-center space-x-1.5"><i class="fa-solid fa-file-lines"></i><span>2. Bản in</span></button>
+    </div>
+
+    <main class="flex-1 max-w-[1600px] w-full mx-auto p-3 sm:p-5 lg:p-6 flex flex-col lg:flex-row gap-6 items-start">
+      
+      <!-- ================= CỘT TRÁI: FORM ================= -->
+      <div id="section-form" class="w-full lg:w-[46%] xl:w-[45%] flex flex-col space-y-4">
+
+        <!-- THÔNG TIN CÔNG TY -->
+        <div class="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-xs">
+          <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div class="flex items-center space-x-2">
+              <span class="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs"><i class="fa-solid fa-building"></i></span>
+              <h2 class="text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-800">Đơn Vị Phát Hành</h2>
+            </div>
+            <button id="btnToggleCompanyEdit" onclick="window.toggleCompanyEditMode()" class="admin-only px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 hover:text-blue-600 border border-slate-200 transition flex items-center gap-1.5">
+              <i class="fa-solid fa-pen"></i><span>✏️ Chỉnh sửa</span>
+            </button>
+          </div>
+          <div id="companyReadOnlyView" class="pt-3 space-y-1.5 text-xs sm:text-sm">
+            <div id="roCompanyName" class="font-extrabold text-blue-700 text-sm sm:text-base">CÔNG TY TNHH PHẠM DUY KHANG</div>
+            <div class="text-slate-600 flex items-start gap-2"><i class="fa-solid fa-location-dot text-slate-400 mt-1 w-3.5"></i> <span><strong>Địa chỉ:</strong> <span id="roCompanyAddress">860/84A Xô Viết Nghệ Tĩnh, P. Thạnh Mỹ Tây, TP.HCM</span></span></div>
+            <div class="text-slate-600 flex items-start gap-2"><i class="fa-solid fa-code-branch text-slate-400 mt-1 w-3.5"></i> <span><strong>Chi nhánh:</strong> <span id="roCompanyBranch">A34/9JS Quốc Lộ 50, P. Bình Hưng, TP.HCM</span></span></div>
+            <div class="grid grid-cols-2 gap-1 pt-0.5 text-slate-700">
+              <div class="flex items-center gap-2"><i class="fa-solid fa-phone text-slate-400 w-3.5"></i> <span><strong>Hotline:</strong> <span id="roCompanyHotline" class="font-bold text-rose-600">0986.450.025</span></span></div>
+              <div class="flex items-center gap-2"><i class="fa-solid fa-hashtag text-slate-400 w-3.5"></i> <span><strong>MST:</strong> <span id="roCompanyTax" class="font-bold">0310085652</span></span></div>
+            </div>
+          </div>
+          <div id="companyEditFormView" class="hidden pt-3 space-y-3">
+            <div><label class="block text-xs font-bold mb-1">Tên đơn vị:</label><input type="text" id="sellerName" oninput="window.renderDocPreview()" class="w-full text-sm font-bold bg-slate-50 border border-slate-300 rounded-lg p-2 focus:outline-none"></div>
+            <div><label class="block text-xs font-bold mb-1">Địa chỉ:</label><input type="text" id="sellerAddress" oninput="window.renderDocPreview()" class="w-full text-sm bg-slate-50 border border-slate-300 rounded-lg p-2 focus:outline-none"></div>
+            <div><label class="block text-xs font-bold mb-1">Chi nhánh:</label><input type="text" id="sellerBranch" oninput="window.renderDocPreview()" class="w-full text-sm bg-slate-50 border border-slate-300 rounded-lg p-2 focus:outline-none"></div>
+            <div class="grid grid-cols-2 gap-2">
+              <div><label class="block text-xs font-bold mb-1">Hotline:</label><input type="text" id="sellerPhone" oninput="window.renderDocPreview()" class="w-full text-sm bg-slate-50 border border-slate-300 rounded-lg p-2 focus:outline-none"></div>
+              <div><label class="block text-xs font-bold mb-1">MST:</label><input type="text" id="sellerTaxCode" oninput="window.renderDocPreview()" class="w-full text-sm bg-slate-50 border border-slate-300 rounded-lg p-2 focus:outline-none"></div>
+            </div>
+            <button onclick="window.saveCompanyInfoToCloud()" class="w-full py-2 mt-2 rounded-xl text-sm font-bold text-white bg-blue-600 shadow-sm">💾 Lưu thông tin</button>
+          </div>
+        </div>
+
+        <!-- CẤU HÌNH THEO TAB -->
+        <div class="bg-white rounded-2xl p-4 sm:p-5 border-2 border-blue-200 shadow-xs">
+          <!-- Quote -->
+          <div id="modeConfig_quote" class="space-y-3">
+            <span class="text-sm font-bold uppercase tracking-wider text-blue-700"><i class="fa-solid fa-sliders"></i> Cấu Hình Báo Giá</span>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <label id="quoteSumCard_sum" onclick="window.setQuoteSumMode('sum')" class="cursor-pointer rounded-xl p-3 border-2 border-blue-600 bg-blue-50/60 flex gap-2">
+                <input type="radio" name="quoteSumRadio" value="sum" checked class="mt-0.5 text-blue-600">
+                <div><div class="text-sm font-bold">Cộng tổng đơn</div><p class="text-[11px] text-slate-600">Tính tổng tiền, VAT.</p></div>
+              </label>
+              <label id="quoteSumCard_options" onclick="window.setQuoteSumMode('options')" class="cursor-pointer rounded-xl p-3 border-2 border-slate-200 bg-slate-50/60 flex gap-2">
+                <input type="radio" name="quoteSumRadio" value="options" class="mt-0.5 text-blue-600">
+                <div><div class="text-sm font-bold">Không cộng tổng</div><p class="text-[11px] text-slate-600">Báo giá nhiều Option.</p></div>
+              </label>
+            </div>
+          </div>
+          <!-- Order -->
+          <div id="modeConfig_order" class="hidden space-y-2">
+            <span class="text-sm font-bold uppercase tracking-wider text-indigo-700"><i class="fa-solid fa-cart-check"></i> Đơn Đặt Hàng</span>
+            <p class="text-xs text-slate-600 mb-2">Bản in sẽ hiển thị đầy đủ tổng thanh toán, tiền cọc và chữ ký 2 bên.</p>
+            <div class="grid grid-cols-3 gap-1">
+              <button id="orderSizeBtn_A4" onclick="window.setDeliveryPaperSize('A4')" class="py-2 rounded-lg text-xs font-bold border bg-indigo-600 text-white border-indigo-600">📄 Khổ A4</button>
+              <button id="orderSizeBtn_A5-portrait" onclick="window.setDeliveryPaperSize('A5-portrait')" class="py-2 rounded-lg text-xs font-bold border bg-white text-slate-700 border-slate-300">📋 Khổ A5</button>
+              <button id="orderSizeBtn_A6-portrait" onclick="window.setDeliveryPaperSize('A6-portrait')" class="py-2 rounded-lg text-xs font-bold border bg-white text-slate-700 border-slate-300">🎫 Khổ A6</button>
+            </div>
+          </div>
+          <!-- Delivery -->
+          <div id="modeConfig_delivery" class="hidden space-y-3">
+            <span class="text-sm font-bold uppercase tracking-wider text-emerald-700"><i class="fa-solid fa-truck-ramp-box"></i> Phiếu Giao Hàng</span>
+            <div class="grid grid-cols-3 gap-1">
+              <button id="paperSizeBtn_A4" onclick="window.setDeliveryPaperSize('A4')" class="py-2 rounded-lg text-xs font-bold border bg-emerald-600 text-white border-emerald-600">📄 Khổ A4</button>
+              <button id="paperSizeBtn_A5-landscape" onclick="window.setDeliveryPaperSize('A5-landscape')" class="py-2 rounded-lg text-xs font-bold border bg-white text-slate-700 border-slate-300">🏷 A5 Ngang</button>
+              <button id="paperSizeBtn_A5-portrait" onclick="window.setDeliveryPaperSize('A5-portrait')" class="py-2 rounded-lg text-xs font-bold border bg-white text-slate-700 border-slate-300">📋 A5 Đứng</button>
+            </div>
+            <div class="grid grid-cols-2 gap-2 mt-2">
+              <select id="deliveryTitleSelect" onchange="window.renderDocPreview()" class="bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs font-bold text-emerald-800 outline-none">
+                <option value="PHIẾU GIAO HÀNG">PHIẾU GIAO HÀNG</option>
+                <option value="GIAO HÀNG TẠM TÍNH">GIAO HÀNG TẠM TÍNH</option>
+              </select>
+              <label class="flex items-center gap-2 text-xs font-bold cursor-pointer">
+                <input type="checkbox" id="deliveryShowPriceCheckbox" checked onchange="window.renderDocPreview()" class="w-4 h-4 text-emerald-600"> <span>Hiện Đơn giá & Tiền</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- KHÁCH HÀNG -->
+        <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs space-y-3 relative">
+          
+          <!-- Bọc mờ nếu không phải tab báo giá -->
+          <div id="customerLockOverlay" class="absolute inset-0 bg-slate-50/50 backdrop-blur-[1px] z-10 hidden flex-col items-center justify-center rounded-2xl">
+            <div class="bg-white px-4 py-2 rounded-full shadow border border-slate-200 text-xs font-bold text-slate-500 flex gap-2 items-center">
+              <i class="fa-solid fa-lock"></i> Khóa chỉnh sửa (Chỉ sửa ở tab Báo Giá)
+            </div>
+          </div>
+
+          <div class="flex justify-between items-center border-b border-slate-100 pb-2 relative z-20">
+            <h2 class="text-sm font-bold text-slate-800"><i class="fa-solid fa-user-check text-blue-600"></i> Khách Hàng</h2>
+            <div class="flex gap-1" id="customerActionButtons">
+              <button onclick="window.saveCustomerToCloud()" class="px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold"><i class="fa-solid fa-cloud-arrow-up"></i> Lưu KH</button>
+              <button onclick="window.resetCustomerForm()" class="px-2.5 py-1.5 rounded-lg bg-slate-100 text-slate-700 text-xs font-bold"><i class="fa-solid fa-rotate-right"></i> Mới</button>
+            </div>
+          </div>
+          
+          <!-- KHUNG AI NHẬP NHANH (Mới khôi phục) -->
+          <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-3 relative mb-2" id="aiInputBlock">
+            <span class="absolute top-[-10px] right-3 bg-indigo-600 text-white text-[9px] px-2 py-0.5 rounded-full font-bold">AI ASSISTANT</span>
+            <label class="block text-xs font-bold text-indigo-800 mb-1">Nhập liệu siêu tốc bằng AI</label>
+            <div class="flex gap-2">
+              <input type="text" id="aiPromptInput" placeholder="Dán tin nhắn Zalo của khách vào đây..." class="flex-1 text-xs p-2 rounded-lg border border-indigo-300 focus:outline-none focus:ring-1 focus:ring-indigo-500">
+              <button onclick="window.processAI()" id="btnProcessAI" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm whitespace-nowrap transition"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Phân tích</button>
+            </div>
+            <p class="text-[10px] text-indigo-500 mt-1 italic" id="aiStatusMsg">Nhập yêu cầu để AI tự động điền Form & Bảng giá.</p>
+          </div>
+
+          <div class="grid grid-cols-3 gap-2">
+            <div><label class="block text-xs font-bold mb-1">Mã Phiếu</label><input type="text" id="docNumberInput" readonly class="w-full bg-slate-100 border border-slate-300 rounded-lg p-2 text-xs font-mono font-bold text-blue-700 italic"></div>
+            <div><label class="block text-xs font-bold mb-1">Ngày lập</label><input type="text" id="docDateInput" oninput="window.renderDocPreview()" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs"></div>
+            <div><label class="block text-xs font-bold mb-1">Người lập</label><input type="text" id="docCreatorInput" readonly class="w-full bg-slate-100 border border-slate-300 rounded-lg p-2 text-xs font-bold text-slate-600 cursor-not-allowed"></div>
+          </div>
+          <div><label class="block text-xs font-bold mb-1">Tên khách hàng *</label><textarea id="custName" rows="2" oninput="window.renderDocPreview()" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-sm font-bold outline-none transition-colors">CÔNG TY TNHH THƯƠNG MẠI DỊCH VỤ ABC</textarea></div>
+          <div class="grid grid-cols-3 gap-2">
+            <div><label class="block text-xs font-bold mb-1">MST</label><input type="text" id="custTaxId" value="0312345678" oninput="window.renderDocPreview()" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs font-mono transition-colors"></div>
+            <div><label class="block text-xs font-bold mb-1">SĐT Cty</label><input type="text" id="custCompanyPhone" value="028.3812.3456" oninput="window.renderDocPreview()" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs transition-colors"></div>
+            <div><label class="block text-xs font-bold mb-1">Email</label><input type="text" id="custEmail" value="lienhe@abc.com.vn" oninput="window.renderDocPreview()" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs transition-colors"></div>
+          </div>
+          <div><label class="block text-xs font-bold mb-1">Địa chỉ Cty</label><input type="text" id="custAddress" value="123 Nguyễn Thị Minh Khai, P. Bến Nghé, Quận 1, TP.HCM" oninput="window.handleCompanyAddressInput()" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs transition-colors"></div>
+          <div class="grid grid-cols-2 gap-2">
+            <div><label class="block text-xs font-bold mb-1">Người liên hệ</label><input type="text" id="contactPerson" value="Anh Trần Văn Bình" oninput="window.renderDocPreview()" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs transition-colors"></div>
+            <div><label class="block text-xs font-bold mb-1">SĐT liên hệ</label><input type="text" id="custPhone" value="0909.123.456" oninput="window.renderDocPreview()" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs font-bold transition-colors"></div>
+          </div>
+          <div class="border-t border-slate-100 pt-2 mt-2 relative z-20">
+            <div class="flex justify-between items-center mb-1">
+              <label class="text-xs font-bold">Địa chỉ giao hàng</label>
+              <label class="flex items-center gap-1 cursor-pointer bg-blue-50 text-blue-700 px-2 py-1 rounded text-[10px] font-bold border border-blue-200" id="sameAddressLabel">
+                <input type="checkbox" id="sameAddressCheckbox" onchange="window.toggleSameDeliveryAddress()" class="w-3 h-3"> Trùng ĐC công ty
+              </label>
+            </div>
+            <input type="text" id="deliveryAddress" value="Kho Xưởng ABC - 456 Phan Huy Ích, Phường 12, Gò Vấp, TP.HCM" oninput="window.renderDocPreview()" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs mb-2 transition-colors">
+            <div><label class="block text-xs font-bold mb-1">Thời gian giao</label><input type="text" id="deliveryTime" value="Sáng thứ 6 (Trước 10h)" oninput="window.renderDocPreview()" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs transition-colors"></div>
+          </div>
+          <input type="hidden" id="currentCustomerId" value="">
+        </div>
+
+        <!-- BẢNG HÀNG HÓA -->
+        <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs space-y-3">
+          <div class="flex justify-between items-center">
+            <h2 class="text-sm font-bold"><i class="fa-solid fa-boxes-stacked text-blue-600"></i> Hàng Hóa & Tính Tiền</h2>
+            <button onclick="window.addItemRow()" class="px-2 py-1 bg-blue-600 text-white text-xs font-bold rounded-lg shadow-sm hover:bg-blue-700 transition"><i class="fa-solid fa-plus"></i> Thêm hàng</button>
+          </div>
+          
+          <div class="overflow-x-auto border border-slate-200 rounded-lg">
+            <table class="w-full text-left border-collapse text-xs">
+              <thead class="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
+                <tr><th class="p-2 text-center w-10">STT</th><th class="p-2 min-w-[150px]">TÊN HÀNG</th><th class="p-2 w-16">ĐVT</th><th class="p-2 text-right w-20">SL</th><th class="p-2 text-right w-28">ĐƠN GIÁ</th><th class="p-2 text-right w-28">THÀNH TIỀN</th><th class="p-2 w-8"></th></tr>
+              </thead>
+              <tbody id="itemsTableBody" class="divide-y divide-slate-200"></tbody>
+            </table>
+          </div>
+
+          <!-- TỔNG KẾT TÀI CHÍNH -->
+          <div id="financialSummaryPanel" class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2 text-sm hidden">
+            <div class="flex justify-between"><span>Cộng tiền hàng:</span><strong id="displaySubtotal" class="font-mono text-slate-800">0 đ</strong></div>
+            <div class="flex justify-between items-center">
+              <div class="flex gap-2 items-center"><span>VAT:</span><select id="vatSelect" onchange="window.renderDocPreview()" class="border border-slate-300 rounded p-1 text-xs bg-white"><option value="-1">Không</option><option value="0">0%</option><option value="8" selected>8%</option><option value="10">10%</option></select></div>
+              <strong id="displayVatAmount" class="font-mono text-slate-800">0 đ</strong>
+            </div>
+            <div class="flex justify-between border-t border-slate-200 pt-2 text-base"><strong class="uppercase text-slate-900">Tổng thanh toán:</strong><strong id="displayGrandTotal" class="text-rose-600 font-mono">0 đ</strong></div>
+            
+            <!-- TIỀN CỌC -->
+            <div class="border-t border-dashed border-slate-300 pt-2" id="depositBlockUI">
+              <div class="flex justify-between items-center mb-2">
+                <span class="text-xs font-bold text-slate-700">Hình thức đặt cọc:</span>
+                <div class="bg-slate-200 p-1 rounded-lg text-xs flex gap-1">
+                  <button id="depModeBtn_percent" onclick="window.setDepositType('percent')" class="px-2 py-1 bg-white font-bold rounded shadow-sm text-blue-700 transition">Theo %</button>
+                  <button id="depModeBtn_amount" onclick="window.setDepositType('amount')" class="px-2 py-1 text-slate-600 font-bold transition">Số tiền</button>
+                </div>
+              </div>
+              <div class="flex gap-2 items-center">
+                <div id="depositPercentBox" class="flex items-center gap-1">
+                  <input type="number" id="depositPercent" value="50" oninput="window.renderDocPreview()" class="w-16 p-1.5 border border-slate-300 bg-white rounded text-center font-bold text-blue-700 outline-none focus:border-blue-500">%
+                </div>
+                <div id="depositAmountBox" class="hidden w-1/2">
+                  <input type="text" id="depositFixedAmountInput" value="0" placeholder="Nhập số tiền..." oninput="window.handleDepositAmountTyping(this)" class="w-full p-1.5 border border-blue-400 bg-white rounded text-right font-mono font-bold text-blue-700 outline-none">
+                </div>
+                <div class="flex-1 text-right text-xs">
+                  <div>Cọc: <strong id="displayDepositAmount" class="text-blue-700 font-mono text-sm">0 đ</strong></div>
+                  <div>Còn lại: <strong id="displayRemainingAmount" class="text-rose-600 font-mono text-sm">0 đ</strong></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="text-[11px] text-slate-600 italic bg-white p-2 rounded border border-slate-200 mt-2">
+              <div>Số tiền chữ: <strong id="displayAmountWords" class="text-slate-800">Không đồng chẵn.</strong></div>
+              <div id="rowDepositWords">Cọc: <strong id="displayDepositWords" class="text-blue-700">Không đồng chẵn.</strong></div>
+            </div>
+          </div>
+          
+          <div id="noSumSummaryBanner" class="hidden bg-amber-50 p-3 rounded-xl border border-amber-200 text-xs font-bold text-amber-800">
+            Chế độ Báo giá nhiều Option: Tổng tiền sẽ bị ẩn trên bản in.
+          </div>
+
+          <!-- GHI CHÚ -->
+          <div class="border-t border-slate-100 pt-3 mt-3">
+            <label class="block text-xs font-bold mb-1">Ghi chú & Điều khoản</label>
+            <textarea id="docTerms" rows="3" oninput="window.updateTerms(this.value)" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs outline-none focus:ring-1 focus:ring-blue-500"></textarea>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ================= CỘT PHẢI: BẢN IN ================= -->
+      <div id="section-preview" class="w-full lg:w-[54%] xl:w-[55%] flex flex-col space-y-4 lg:sticky lg:top-16">
+        <div class="no-print bg-white rounded-2xl p-3 border border-slate-200 shadow-xs flex flex-wrap gap-2 justify-between items-center text-xs">
+          <div class="flex gap-2 items-center">
+            <span id="previewPaperSizeBadge" class="px-2 py-1.5 rounded-lg bg-slate-100 font-bold border border-slate-300 text-slate-700">Khổ A4</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="window.saveOrderToCloud()" id="headerSaveOrderBtn" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow font-bold flex gap-1.5 items-center transition"><i class="fa-solid fa-cloud-arrow-up"></i> Lưu Đơn</button>
+            <button onclick="window.exportToPdf()" id="headerExportPdfBtn" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow font-bold flex gap-1.5 items-center transition"><i class="fa-solid fa-file-pdf"></i> Tải PDF</button>
+            <button onclick="window.print()" class="px-3 py-1.5 bg-slate-800 hover:bg-black text-white rounded-lg shadow font-bold transition"><i class="fa-solid fa-print"></i> In</button>
+          </div>
+        </div>
+
+        <div class="a4-container bg-slate-300 p-2 sm:p-5 rounded-2xl shadow-inner">
+          <div id="zoomWrapper" class="transition-transform origin-top" style="transform: scale(0.92);">
+            <div id="printDocument" class="a4-sheet font-document text-black" contenteditable="false">
+              <!-- Render HTML Bản in ở đây -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- POPUP KHÁCH HÀNG -->
+  <div id="customerModal" class="modal-backdrop fixed inset-0 bg-black/60 z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-3xl w-full p-5 shadow-2xl flex flex-col max-h-[85vh]">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="font-bold text-lg text-slate-800"><i class="fa-solid fa-address-book text-blue-500"></i> Quản lý Khách Hàng</h3>
+        <button onclick="window.closeCustomerModal()" class="text-slate-400 hover:text-slate-700 text-xl"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="flex gap-2 mb-4">
+        <div class="relative flex-1">
+          <i class="fa-solid fa-search absolute left-3 top-2.5 text-slate-400 text-sm"></i>
+          <input type="text" id="searchCustomerInput" oninput="window.renderCustomerList(this.value)" placeholder="Tìm Tên KH, Số điện thoại..." class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-blue-500">
+        </div>
+      </div>
+      <div class="flex-1 overflow-y-auto border border-slate-200 rounded-lg">
+        <table class="w-full text-left border-collapse text-sm">
+          <thead class="bg-slate-100 text-slate-600 sticky top-0 shadow-sm">
+            <tr><th class="p-2">Tên Khách Hàng</th><th class="p-2 w-32">SĐT</th><th class="p-2">Địa chỉ</th><th class="p-2 w-28 text-right">Thao tác</th></tr>
+          </thead>
+          <tbody id="customerListBody" class="divide-y divide-slate-100 bg-white"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- POPUP ĐƠN HÀNG -->
+  <div id="orderModal" class="modal-backdrop fixed inset-0 bg-black/60 z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-4xl w-full p-5 shadow-2xl flex flex-col max-h-[85vh]">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="font-bold text-lg text-slate-800"><i class="fa-solid fa-folder-open text-amber-500"></i> Quản lý Đơn Hàng</h3>
+        <button onclick="window.closeOrderModal()" class="text-slate-400 hover:text-slate-700 text-xl"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="flex-1 overflow-y-auto border border-slate-200 rounded-lg">
+        <table class="w-full text-left border-collapse text-sm">
+          <thead class="bg-slate-100 text-slate-600 sticky top-0 shadow-sm">
+            <tr><th class="p-2 w-32">Mã Phiếu</th><th class="p-2 w-24">Ngày lập</th><th class="p-2">Khách Hàng</th><th class="p-2 text-right w-28">Tổng tiền</th><th class="p-2 text-center w-24">Trạng thái</th><th class="p-2 w-16 text-right"></th></tr>
+          </thead>
+          <tbody id="orderListBody" class="divide-y divide-slate-100 bg-white"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- POPUP CÀI ĐẶT HỆ THỐNG -->
+  <div id="systemSettingsModal" class="modal-backdrop fixed inset-0 bg-black/60 z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
+      <div class="flex justify-between items-center mb-5"><h3 class="font-bold text-lg text-slate-800"><i class="fa-solid fa-gear text-slate-500"></i> Cài đặt Hệ thống</h3><button onclick="window.closeSystemSettingsModal()" class="text-slate-400 hover:text-slate-700 text-xl"><i class="fa-solid fa-xmark"></i></button></div>
+      <div class="space-y-4">
+        <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-xl">
+          <label class="block text-xs font-bold text-emerald-800 mb-1"><i class="fa-brands fa-google"></i> Google Apps Script (Sheet URL)</label>
+          <input type="text" id="configSheetUrl" placeholder="Dán link Web App URL vào đây..." class="w-full text-xs p-2 rounded border border-emerald-300 outline-none focus:ring-2 focus:ring-emerald-400">
+        </div>
+        <div class="p-3 bg-indigo-50 border border-indigo-200 rounded-xl">
+          <label class="block text-xs font-bold text-indigo-800 mb-1"><i class="fa-solid fa-wand-magic-sparkles"></i> Gemini AI API Key</label>
+          <input type="password" id="configGeminiKey" placeholder="Nhập mã API Key của Gemini..." class="w-full text-xs p-2 rounded border border-indigo-300 outline-none focus:ring-2 focus:ring-indigo-400">
+        </div>
+        <button onclick="window.saveSystemSettings()" class="w-full py-2.5 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-xl shadow-md transition">Lưu Cấu Hình</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quản lý Nhân sự -->
+  <div id="employeeModal" class="modal-backdrop fixed inset-0 bg-black/60 z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-lg w-full p-5 shadow-2xl">
+      <div class="flex justify-between items-center mb-4"><h3 class="font-bold text-lg"><i class="fa-solid fa-users-gear text-amber-500"></i> Quản lý Nhân sự</h3><button onclick="window.closeEmployeeModal()"><i class="fa-solid fa-xmark"></i></button></div>
+      <form id="formAddEmployee" class="space-y-3 mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+        <div class="font-bold text-xs text-amber-800 mb-1">Cấp tài khoản mới cho nhân viên:</div>
+        <input type="text" id="newEmpFullName" required placeholder="Họ và tên (VD: Nguyễn Văn A)" class="w-full text-sm p-2 rounded border border-slate-300 outline-none focus:border-amber-500">
+        <div class="flex gap-2">
+          <input type="text" id="newEmpUser" required placeholder="Tên đăng nhập" class="flex-1 text-sm p-2 rounded border border-slate-300 outline-none focus:border-amber-500">
+          <input type="password" id="newEmpPass" required placeholder="Mật khẩu" class="flex-1 text-sm p-2 rounded border border-slate-300 outline-none focus:border-amber-500">
+          <button type="submit" class="px-3 bg-amber-600 hover:bg-amber-700 text-white rounded text-sm font-bold shadow-sm transition">Thêm</button>
+        </div>
+      </form>
+      <div class="font-bold text-xs text-slate-600 mb-2">Danh sách tài khoản hệ thống:</div>
+      <div id="employeeList" class="space-y-2 max-h-60 overflow-y-auto border border-slate-200 rounded-lg p-2 bg-slate-50 text-sm"></div>
+    </div>
+  </div>
+
+  <!-- Toast Message -->
+  <div id="toast-container" class="fixed top-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- Gọi file Code xử lý -->
+  <script src="js/core.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
