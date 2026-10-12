@@ -30,8 +30,20 @@ window.processAI = () => {
 window.selectCustomerById = function(id) {
   if (window.activeDocMode !== 'quote') { window.showToast("Chỉ có thể chọn khách hàng ở Tab Báo Giá", "error"); return; }
   let custData = JSON.parse(window.SafeStore.get('docugen_customers') || '{}'); const c = custData[id]; if(!c) return;
+  
   document.getElementById('currentCustomerId').value = id;
-  ['custName','custTaxId','custCompanyPhone','custEmail','custAddress','contactPerson','custPhone','deliveryAddress','deliveryTime'].forEach(k => { document.getElementById(k).value = c[k] || ''; });
+  
+  // Nối đúng tên biến được lưu vào đúng ô hiển thị trên màn hình
+  document.getElementById('custName').value = c.name || '';
+  document.getElementById('custTaxId').value = c.taxId || '';
+  document.getElementById('custCompanyPhone').value = c.companyPhone || '';
+  document.getElementById('custEmail').value = c.email || '';
+  document.getElementById('custAddress').value = c.address || '';
+  document.getElementById('contactPerson').value = c.contactPerson || '';
+  document.getElementById('custPhone').value = c.phone || '';
+  document.getElementById('deliveryAddress').value = c.deliveryAddress || '';
+  document.getElementById('deliveryTime').value = c.deliveryTime || '';
+  
   document.getElementById('sameAddressCheckbox').checked = !!c.sameAddress;
   window.toggleSameDeliveryAddress(); window.renderDocPreview(); window.closeCustomerModal(); window.showToast("Đã nạp thông tin KH", "success");
 };
@@ -306,7 +318,14 @@ window.exportToPdf = async function() {
 
 window.switchViewTab = (t) => { document.getElementById('section-form').classList.toggle('hidden', t!=='form'); document.getElementById('section-preview').classList.toggle('hidden', t==='form'); };
 window.fitZoomScreen = () => document.getElementById('zoomWrapper').style.transform = `scale(${window.innerWidth < 768 ? 0.6 : (window.innerWidth < 1280 ? 0.8 : 0.92)})`;
-window.addEventListener('resize', window.fitZoomScreen);
-
+// Bật tính năng gõ tìm kiếm khách hàng (gõ tới đâu lọc tới đó)
+document.addEventListener('DOMContentLoaded', () => {
+    const searchCustomerInput = document.getElementById('searchCustomerInput');
+    if (searchCustomerInput) {
+        searchCustomerInput.addEventListener('input', (e) => {
+            window.renderCustomerList(e.target.value);
+        });
+    }
+});
 // KÍCH HOẠT HỆ THỐNG SAU KHI LOAD XONG FILE
 window.initAppAuth();
