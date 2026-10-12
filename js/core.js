@@ -248,20 +248,27 @@ window.renderOrderList = () => {
 };
 
 window.saveOrderToCloud = async () => {
+  // Lấy tên tab hiện tại để thông báo
+  const modeName = window.activeDocMode === 'quote' ? 'BÁO GIÁ' : (window.activeDocMode === 'order' ? 'ĐƠN ĐẶT HÀNG' : 'PHIẾU GIAO HÀNG');
+  
+  // Yêu cầu xác nhận trước khi lưu
+  if (!confirm(`Bạn có chắc chắn muốn lưu [${modeName}] không?`)) return;
+
   const isNew = !window.currentOrderId;
   const now = new Date();
   if (isNew) {
-    // Tạo Mã Gốc (Base ID) dùng chung cho cả 3 phiếu
+    // Chặn ngay từ đầu nếu tạo mới mà không ở tab Báo giá
+    if (window.activeDocMode !== 'quote') {
+        window.showToast("Bắt buộc phải làm Báo Giá trước tiên!", "error"); 
+        return;
+    }
     const num = `${now.getFullYear()}${String(now.getDate()).padStart(2,'0')}${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
     window.currentOrderId = num; 
     window.orderDates = { quote: null, order: null, delivery: null };
   }
   if (!window.orderDates) window.orderDates = { quote: null, order: null, delivery: null };
   
-  // Lưu ngày tháng riêng biệt cho từng tab
   window.orderDates[window.activeDocMode] = document.getElementById('docDateInput').value || now.toLocaleDateString('vi-VN');
-
-  // Backup dữ liệu tab hiện tại vào bộ nhớ tổng trước khi lưu
   window.tabItems[window.activeDocMode] = JSON.parse(JSON.stringify(window.itemsList));
   window.tabNotes[window.activeDocMode] = document.getElementById('docTerms').value;
 
@@ -280,8 +287,8 @@ window.saveOrderToCloud = async () => {
     deliveryTime: document.getElementById('deliveryTime').value, 
     sameAddress: document.getElementById('sameAddressCheckbox').checked, 
     customerId: document.getElementById('currentCustomerId').value, 
-    tabItems: window.tabItems, // LƯU CÙNG LÚC 3 BẢNG HÀNG HÓA
-    tabNotes: window.tabNotes, // LƯU CÙNG LÚC 3 GHI CHÚ
+    tabItems: window.tabItems, 
+    tabNotes: window.tabNotes, 
     total: document.getElementById('displayGrandTotal').innerText.replace(' đ', ''), 
     quoteSumMode: window.quoteSumMode, 
     depositType: window.depositType, 
@@ -296,9 +303,8 @@ window.saveOrderToCloud = async () => {
   
   window.initDefaultDocMeta(); 
   window.renderDocPreview(); 
-  window.showToast(`Đã lưu Bộ Hồ Sơ: ${window.currentOrderId}`, "success");
+  window.showToast(`Đã lưu thành công ${modeName}`, "success");
 
-  // Đồng bộ Cloud
   let jsonPayload = JSON.stringify(orderData);
   await window.cloudSync('SAVE_ORDER', { MaPhieu: window.currentOrderId, NgayLap: window.orderDates[window.activeDocMode], TenKH: orderData.customerName, LoaiPhieu: orderData.mode, TongTien: orderData.total, Data_JSON: jsonPayload });
 };
