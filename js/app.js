@@ -64,7 +64,14 @@ window.switchDocMode = (m, preventReset = false) => {
           else window.tabItems[m] = [{ name: "", unit: "Cái", qty: 1000, price: 0 }];
       }
       window.itemsList = JSON.parse(JSON.stringify(window.tabItems[m])); document.getElementById('docTerms').value = window.tabNotes[m] !== undefined ? window.tabNotes[m] : '';
-      window.currentOrderId = null; window.currentOrderDate = null; window.initDefaultDocMeta();
+      
+      // ĐIỂM SỬA QUAN TRỌNG: Chỉ reset ID nếu đó là Đang Tạo Mới (chưa lưu). 
+      // Nếu đã có Mã phiếu (load từ data), giữ nguyên Mã phiếu đó khi chuyển tab.
+      if (!window.currentOrderId) {
+         window.currentOrderId = null; 
+         window.currentOrderDate = null;
+      }
+      window.initDefaultDocMeta();
   }
   window.updateModeUI(); window.renderItemsTable(); window.renderDocPreview(); 
 };
