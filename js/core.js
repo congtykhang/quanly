@@ -225,29 +225,82 @@ window.deleteCustomer = async function(id) {
 // QUẢN LÝ ĐƠN HÀNG DB
 window.openOrderModal = () => { document.getElementById('orderModal').classList.remove('hidden'); window.renderOrderList(); };
 window.closeOrderModal = () => document.getElementById('orderModal').classList.add('hidden');
+
 window.renderOrderList = () => {
   let orders = JSON.parse(window.SafeStore.get('docugen_orders') || '{}'); let html = ''; const sortedKeys = Object.keys(orders).sort().reverse();
   sortedKeys.forEach(key => {
-      let o = orders[key]; let statusClass = o.mode === 'quote' ? 'bg-blue-100 text-blue-700' : (o.mode === 'order' ? 'bg-indigo-100 text-indigo-700' : 'bg-emerald-100 text-emerald-700'); let statusText = o.mode === 'quote' ? 'Báo giá' : (o.mode === 'order' ? 'Đặt hàng' : 'Giao hàng');
-      html += `<tr class="border-b border-slate-100 hover:bg-slate-50 cursor-pointer transition-colors" onclick="window.loadOrder('${key}')"><td class="p-3 font-mono font-bold text-xs text-slate-600">${key}</td><td class="p-3 text-xs text-slate-500">${o.date}</td><td class="p-3 font-bold text-slate-800 text-xs truncate max-w-[200px]" title="${o.customerName}">${o.customerName}</td><td class="p-3 font-mono font-bold text-rose-600 text-right">${o.total} đ</td><td class="p-3 text-center"><span class="px-2 py-1 rounded-md text-[10px] font-bold ${statusClass}">${statusText}</span></td><td class="p-3 text-right"><button onclick="event.stopPropagation(); window.deleteOrder('${key}')" class="text-rose-400 hover:text-rose-600 px-2 py-1"><i class="fa-solid fa-trash"></i></button></td></tr>`;
+      let o = orders[key]; 
+      let displayId = o.baseId || key; 
+      
+      // Đổi màu thông minh dựa trên việc họ đã đi tới bước nào
+      let statusClass = 'bg-slate-100 text-slate-700';
+      let statusText = 'Bộ Hồ Sơ';
+      if (o.orderDates && o.orderDates.delivery) { statusClass = 'bg-emerald-100 text-emerald-700'; statusText = 'Đã Giao Hàng'; }
+      else if (o.orderDates && o.orderDates.order) { statusClass = 'bg-indigo-100 text-indigo-700'; statusText = 'Đã Đặt Hàng'; }
+      else { statusClass = 'bg-blue-100 text-blue-700'; statusText = 'Đang Báo Giá'; }
+      
+      let dispDate = o.date || '';
+      if (o.orderDates) dispDate = o.orderDates.delivery || o.orderDates.order || o.orderDates.quote || o.date;
+
+      html += `<tr class="border-b border-slate-100 hover:bg-slate-50 cursor-pointer transition-colors" onclick="window.loadOrder('${key}')"><td class="p-3 font-mono font-bold text-xs text-slate-600">${displayId}</td><td class="p-3 text-xs text-slate-500">${dispDate}</td><td class="p-3 font-bold text-slate-800 text-xs truncate max-w-[200px]" title="${o.customerName}">${o.customerName}</td><td class="p-3 font-mono font-bold text-rose-600 text-right">${o.total} đ</td><td class="p-3 text-center"><span class="px-2 py-1 rounded-md text-[10px] font-bold ${statusClass}">${statusText}</span></td><td class="p-3 text-right"><button onclick="event.stopPropagation(); window.deleteOrder('${key}')" class="text-rose-400 hover:text-rose-600 px-2 py-1"><i class="fa-solid fa-trash"></i></button></td></tr>`;
   });
-  document.getElementById('orderListBody').innerHTML = html || '<tr><td colspan="6" class="text-center p-8 text-slate-400 font-medium">Chưa có đơn hàng nào được lưu.</td></tr>';
+  document.getElementById('orderListBody').innerHTML = html || '<tr><td colspan="6" class="text-center p-8 text-slate-400 font-medium">Chưa có bộ hồ sơ nào được lưu.</td></tr>';
 };
 
 window.saveOrderToCloud = async () => {
   const isNew = !window.currentOrderId;
+  const now = new Date();
   if (isNew) {
-    const now = new Date(); const pfx = window.activeDocMode === 'quote' ? 'BG' : (window.activeDocMode === 'order' ? 'ĐH' : 'GH');
+    // Tạo Mã Gốc (Base ID) dùng chung cho cả 3 phiếu
     const num = `${now.getFullYear()}${String(now.getDate()).padStart(2,'0')}${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
-    window.currentOrderId = `${pfx}-${num}`; window.currentOrderDate = now.toLocaleDateString('vi-VN');
+    window.currentOrderId = num; 
+    window.orderDates = { quote: null, order: null, delivery: null };
   }
-  let orderData = { mode: window.activeDocMode, date: window.currentOrderDate, customerName: document.getElementById('custName').value, taxId: document.getElementById('custTaxId').value, companyPhone: document.getElementById('custCompanyPhone').value, email: document.getElementById('custEmail').value, address: document.getElementById('custAddress').value, contactPerson: document.getElementById('contactPerson').value, phone: document.getElementById('custPhone').value, deliveryAddress: document.getElementById('deliveryAddress').value, deliveryTime: document.getElementById('deliveryTime').value, sameAddress: document.getElementById('sameAddressCheckbox').checked, customerId: document.getElementById('currentCustomerId').value, items: JSON.parse(JSON.stringify(window.itemsList)), total: document.getElementById('displayGrandTotal').innerText.replace(' đ', ''), quoteSumMode: window.quoteSumMode, depositType: window.depositType, depositPercent: document.getElementById('depositPercent').value, depositAmount: document.getElementById('depositFixedAmountInput').value, terms: document.getElementById('docTerms').value, vat: document.getElementById('vatSelect').value };
+  if (!window.orderDates) window.orderDates = { quote: null, order: null, delivery: null };
   
-  let orders = JSON.parse(window.SafeStore.get('docugen_orders') || '{}'); orders[window.currentOrderId] = orderData; window.SafeStore.set('docugen_orders', JSON.stringify(orders));
-  window.initDefaultDocMeta(); window.renderDocPreview(); window.showToast(`Đã lưu Phiếu: ${window.currentOrderId}`, "success");
+  // Lưu ngày tháng riêng biệt cho từng tab
+  window.orderDates[window.activeDocMode] = document.getElementById('docDateInput').value || now.toLocaleDateString('vi-VN');
 
-  let jsonPayload = JSON.stringify({ taxId: orderData.taxId, companyPhone: orderData.companyPhone, email: orderData.email, address: orderData.address, contactPerson: orderData.contactPerson, phone: orderData.phone, deliveryAddress: orderData.deliveryAddress, deliveryTime: orderData.deliveryTime, sameAddress: orderData.sameAddress, customerId: orderData.customerId, items: orderData.items, quoteSumMode: orderData.quoteSumMode, depositType: orderData.depositType, depositPercent: orderData.depositPercent, depositAmount: orderData.depositAmount, terms: orderData.terms, vat: orderData.vat });
-  await window.cloudSync('SAVE_ORDER', { MaPhieu: window.currentOrderId, NgayLap: window.currentOrderDate, TenKH: orderData.customerName, LoaiPhieu: orderData.mode, TongTien: orderData.total, Data_JSON: jsonPayload });
+  // Backup dữ liệu tab hiện tại vào bộ nhớ tổng trước khi lưu
+  window.tabItems[window.activeDocMode] = JSON.parse(JSON.stringify(window.itemsList));
+  window.tabNotes[window.activeDocMode] = document.getElementById('docTerms').value;
+
+  let orderData = { 
+    baseId: window.currentOrderId,
+    mode: window.activeDocMode, 
+    orderDates: window.orderDates,
+    customerName: document.getElementById('custName').value, 
+    taxId: document.getElementById('custTaxId').value, 
+    companyPhone: document.getElementById('custCompanyPhone').value, 
+    email: document.getElementById('custEmail').value, 
+    address: document.getElementById('custAddress').value, 
+    contactPerson: document.getElementById('contactPerson').value, 
+    phone: document.getElementById('custPhone').value, 
+    deliveryAddress: document.getElementById('deliveryAddress').value, 
+    deliveryTime: document.getElementById('deliveryTime').value, 
+    sameAddress: document.getElementById('sameAddressCheckbox').checked, 
+    customerId: document.getElementById('currentCustomerId').value, 
+    tabItems: window.tabItems, // LƯU CÙNG LÚC 3 BẢNG HÀNG HÓA
+    tabNotes: window.tabNotes, // LƯU CÙNG LÚC 3 GHI CHÚ
+    total: document.getElementById('displayGrandTotal').innerText.replace(' đ', ''), 
+    quoteSumMode: window.quoteSumMode, 
+    depositType: window.depositType, 
+    depositPercent: document.getElementById('depositPercent').value, 
+    depositAmount: document.getElementById('depositFixedAmountInput').value, 
+    vat: document.getElementById('vatSelect').value 
+  };
+  
+  let orders = JSON.parse(window.SafeStore.get('docugen_orders') || '{}'); 
+  orders[window.currentOrderId] = orderData; 
+  window.SafeStore.set('docugen_orders', JSON.stringify(orders));
+  
+  window.initDefaultDocMeta(); 
+  window.renderDocPreview(); 
+  window.showToast(`Đã lưu Bộ Hồ Sơ: ${window.currentOrderId}`, "success");
+
+  // Đồng bộ Cloud
+  let jsonPayload = JSON.stringify(orderData);
+  await window.cloudSync('SAVE_ORDER', { MaPhieu: window.currentOrderId, NgayLap: window.orderDates[window.activeDocMode], TenKH: orderData.customerName, LoaiPhieu: orderData.mode, TongTien: orderData.total, Data_JSON: jsonPayload });
 };
 
 window.deleteOrder = async (id) => {
