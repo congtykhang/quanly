@@ -10,6 +10,7 @@ window.deliveryPaperSize = 'A4';
 window.isCompanyEditing = false;
 window.currentOrderId = null;
 window.currentOrderDate = null;
+window.orderDates = null;
 
 window.processAI = () => {
   if (window.activeDocMode !== 'quote') { window.showToast("AI chỉ hỗ trợ phân tích khi đang lập Báo giá mới!", "error"); return; }
@@ -37,43 +38,74 @@ window.selectCustomerById = function(id) {
 
 window.loadOrder = (id) => {
   let orders = JSON.parse(window.SafeStore.get('docugen_orders') || '{}'); let o = orders[id]; if(!o) return;
-  window.currentOrderId = id; window.currentOrderDate = o.date; 
-  window.switchDocMode(o.mode, true); // ĐỔI THÀNH true Ở ĐÂY ĐỂ NGĂN RESET MÃ PHIẾU
   
+  // Tương thích ngược: Cắt bỏ tiền tố cũ nếu là data cũ
+  window.currentOrderId = o.baseId || id;
+  if (window.currentOrderId.includes('-') && (window.currentOrderId.startsWith('BG-') || window.currentOrderId.startsWith('ĐH-') || window.currentOrderId.startsWith('GH-'))) {
+      window.currentOrderId = window.currentOrderId.substring(3); 
+  }
+  window.orderDates = o.orderDates || { quote: o.date, order: null, delivery: null };
+  
+  // Nạp đồng loạt 3 tab dữ liệu
+  if (o.tabItems) window.tabItems = JSON.parse(JSON.stringify(o.tabItems));
+  else { window.tabItems = { quote: null, order: null, delivery: null }; window.tabItems[o.mode || 'quote'] = JSON.parse(JSON.stringify(o.items)); }
+
+  if (o.tabNotes) window.tabNotes = JSON.parse(JSON.stringify(o.tabNotes));
+  else {
+      window.tabNotes = { quote: "- Báo giá có giá trị trong vòng 15 ngày.\n- Giá trên chưa bao gồm 8% thuế GTGT.\n- Miễn phí giao hàng nội thành TP.HCM.", order: "- Khách hàng kiểm tra và ký xác nhận duyệt nội dung, màu sắc trước khi sản xuất hàng loạt.\n- Hàng giao tận nơi theo thỏa thuận.", delivery: "- Quý khách vui lòng kiểm tra kỹ số lượng và chất lượng trước khi nhận hàng.\n- Hàng giao tận nơi theo thỏa thuận." };
+      window.tabNotes[o.mode || 'quote'] = o.terms || '';
+  }
+
   document.getElementById('custName').value = o.customerName || ''; document.getElementById('custTaxId').value = o.taxId || ''; document.getElementById('custCompanyPhone').value = o.companyPhone || ''; document.getElementById('custEmail').value = o.email || ''; document.getElementById('custAddress').value = o.address || ''; document.getElementById('contactPerson').value = o.contactPerson || ''; document.getElementById('custPhone').value = o.phone || ''; document.getElementById('deliveryAddress').value = o.deliveryAddress || ''; document.getElementById('deliveryTime').value = o.deliveryTime || ''; document.getElementById('sameAddressCheckbox').checked = o.sameAddress || false; document.getElementById('currentCustomerId').value = o.customerId || '';
-  window.quoteSumMode = o.quoteSumMode || 'sum'; window.depositType = o.depositType || 'percent'; document.getElementById('depositPercent').value = o.depositPercent || 50; document.getElementById('depositFixedAmountInput').value = o.depositAmount || 0; document.getElementById('vatSelect').value = o.vat !== undefined ? o.vat : "8"; document.getElementById('docTerms').value = o.terms || ''; window.tabNotes[o.mode] = o.terms || '';
-  window.tabItems[o.mode] = JSON.parse(JSON.stringify(o.items)); window.itemsList = window.tabItems[o.mode];
-  window.initDefaultDocMeta(); window.updateModeUI(); window.renderItemsTable(); window.closeOrderModal(); window.showToast(`Đã nạp: ${id}`, "success");
+  window.quoteSumMode = o.quoteSumMode || 'sum'; window.depositType = o.depositType || 'percent'; document.getElementById('depositPercent').value = o.depositPercent || 50; document.getElementById('depositFixedAmountInput').value = o.depositAmount || 0; document.getElementById('vatSelect').value = o.vat !== undefined ? o.vat : "8"; 
+  
+  window.switchDocMode(o.mode || 'quote', true);
+  window.closeOrderModal(); window.showToast(`Đã nạp bộ hồ sơ: ${window.currentOrderId}`, "success");
 };
 
 window.initDefaultDocMeta = function() {
   const now = new Date(); const docInput = document.getElementById('docNumberInput');
-  if (!window.currentOrderId) { docInput.value = "Sẽ cấp tự động khi Lưu"; docInput.classList.add('text-amber-600', 'italic', 'text-xs'); docInput.classList.remove('text-blue-700', 'font-bold', 'text-sm'); } 
-  else { docInput.value = window.currentOrderId; docInput.classList.remove('text-amber-600', 'italic', 'text-xs'); docInput.classList.add('text-blue-700', 'font-bold', 'text-sm'); }
-  document.getElementById('docDateInput').value = window.currentOrderDate || now.toLocaleDateString('vi-VN');
+  if (!window.currentOrderId) { 
+      docInput.value = "Sẽ cấp tự động khi Lưu"; 
+      docInput.classList.add('text-amber-600', 'italic', 'text-xs'); docInput.classList.remove('text-blue-700', 'font-bold', 'text-sm'); 
+      document.getElementById('docDateInput').value = now.toLocaleDateString('vi-VN');
+  } 
+  else { 
+      // Tự động nhảy tiền tố BG/ĐH/GH nhưng giữ nguyên Mã gốc
+      const pfx = window.activeDocMode === 'quote' ? 'BG' : (window.activeDocMode === 'order' ? 'ĐH' : 'GH');
+      docInput.value = `${pfx}-${window.currentOrderId}`; 
+      docInput.classList.remove('text-amber-600', 'italic', 'text-xs'); docInput.classList.add('text-blue-700', 'font-bold', 'text-sm'); 
+      
+      // Tự động gọi lại đúng ngày tháng của tab tương ứng
+      let docDate = now.toLocaleDateString('vi-VN');
+      if (window.orderDates && window.orderDates[window.activeDocMode]) docDate = window.orderDates[window.activeDocMode];
+      document.getElementById('docDateInput').value = docDate;
+  }
 };
 
 window.switchDocMode = (m, preventReset = false) => { 
-  if (!window.tabItems[window.activeDocMode]) window.tabItems[window.activeDocMode] = []; window.tabItems[window.activeDocMode] = JSON.parse(JSON.stringify(window.itemsList));
+  // Bắt lấy dữ liệu của tab hiện tại trước khi nhảy sang tab khác
+  if (window.tabItems && window.itemsList) {
+      window.tabItems[window.activeDocMode] = JSON.parse(JSON.stringify(window.itemsList));
+      window.tabNotes[window.activeDocMode] = document.getElementById('docTerms').value;
+  }
   window.activeDocMode = m; 
+
   if (!preventReset) {
+      // Đẩy hàng hóa nối tiếp: Báo giá -> Đặt hàng -> Giao hàng
       if (!window.tabItems[m]) {
           if (m === 'order' && window.tabItems['quote']) window.tabItems[m] = JSON.parse(JSON.stringify(window.tabItems['quote']));
           else if (m === 'delivery' && window.tabItems['order']) window.tabItems[m] = JSON.parse(JSON.stringify(window.tabItems['order']));
           else if (m === 'delivery' && window.tabItems['quote']) window.tabItems[m] = JSON.parse(JSON.stringify(window.tabItems['quote']));
           else window.tabItems[m] = [{ name: "", unit: "Cái", qty: 1000, price: 0 }];
       }
-      window.itemsList = JSON.parse(JSON.stringify(window.tabItems[m])); document.getElementById('docTerms').value = window.tabNotes[m] !== undefined ? window.tabNotes[m] : '';
-      
-      // ĐIỂM SỬA QUAN TRỌNG: Chỉ reset ID nếu đó là Đang Tạo Mới (chưa lưu). 
-      // Nếu đã có Mã phiếu (load từ data), giữ nguyên Mã phiếu đó khi chuyển tab.
-      if (!window.currentOrderId) {
-         window.currentOrderId = null; 
-         window.currentOrderDate = null;
-      }
-      window.initDefaultDocMeta();
+      if (!window.currentOrderId) { window.currentOrderId = null; window.orderDates = null; }
   }
-  window.updateModeUI(); window.renderItemsTable(); window.renderDocPreview(); 
+  
+  window.itemsList = JSON.parse(JSON.stringify(window.tabItems[m])); 
+  document.getElementById('docTerms').value = window.tabNotes[m] !== undefined ? window.tabNotes[m] : '';
+  
+  window.initDefaultDocMeta(); window.updateModeUI(); window.renderItemsTable(); window.renderDocPreview(); 
 };
 
 window.updateTerms = (val) => { window.tabNotes[window.activeDocMode] = val; window.renderDocPreview(); };
@@ -111,7 +143,7 @@ window.toggleSameDeliveryAddress = () => { if(window.activeDocMode !== 'quote') 
 window.handleCompanyAddressInput = () => { if(document.getElementById('sameAddressCheckbox').checked) document.getElementById('deliveryAddress').value = document.getElementById('custAddress').value; window.renderDocPreview(); };
 
 window.resetCustomerForm = () => {
-  window.currentOrderId = null; window.currentOrderDate = null;
+  window.currentOrderId = null; window.orderDates = null;
   ['currentCustomerId','custName','custTaxId','custCompanyPhone','custEmail','custAddress','contactPerson','custPhone','deliveryAddress'].forEach(id => document.getElementById(id).value = '');
   window.tabItems = { quote: null, order: null, delivery: null }; window.tabItems[window.activeDocMode] = [{ name: "", unit: "Cái", qty: 1, price: 0 }]; window.itemsList = JSON.parse(JSON.stringify(window.tabItems[window.activeDocMode]));
   window.tabNotes = { quote: "- Báo giá có giá trị trong vòng 15 ngày.\n- Giá trên chưa bao gồm 8% thuế GTGT.\n- Miễn phí giao hàng nội thành TP.HCM.", order: "- Khách hàng kiểm tra và ký xác nhận duyệt nội dung, màu sắc trước khi sản xuất hàng loạt.\n- Hàng giao tận nơi theo thỏa thuận.", delivery: "- Quý khách vui lòng kiểm tra kỹ số lượng và chất lượng trước khi nhận hàng.\n- Hàng giao tận nơi theo thỏa thuận." };
