@@ -59,7 +59,41 @@ window.loadOrder = (id) => {
   document.getElementById('custName').value = o.customerName || ''; document.getElementById('custTaxId').value = o.taxId || ''; document.getElementById('custCompanyPhone').value = o.companyPhone || ''; document.getElementById('custEmail').value = o.email || ''; document.getElementById('custAddress').value = o.address || ''; document.getElementById('contactPerson').value = o.contactPerson || ''; document.getElementById('custPhone').value = o.phone || ''; document.getElementById('deliveryAddress').value = o.deliveryAddress || ''; document.getElementById('deliveryTime').value = o.deliveryTime || ''; document.getElementById('sameAddressCheckbox').checked = o.sameAddress || false; document.getElementById('currentCustomerId').value = o.customerId || '';
   window.quoteSumMode = o.quoteSumMode || 'sum'; window.depositType = o.depositType || 'percent'; document.getElementById('depositPercent').value = o.depositPercent || 50; document.getElementById('depositFixedAmountInput').value = o.depositAmount || 0; document.getElementById('vatSelect').value = o.vat !== undefined ? o.vat : "8"; 
   
-  window.switchDocMode(o.mode || 'quote', true);
+  window.switchDocMode = (m, preventReset = false) => { 
+  // [BẮT BUỘC TRÌNH TỰ] Nếu người dùng tự bấm chuyển tab (không phải do máy tính tự load)
+  if (!preventReset && m !== window.activeDocMode) {
+      if (m === 'order' && (!window.currentOrderId || !window.orderDates || !window.orderDates['quote'])) {
+          window.showToast("Bắt buộc phải LƯU BÁO GIÁ trước khi lên Đơn Đặt Hàng!", "error");
+          return; // Hủy lệnh chuyển tab
+      }
+      if (m === 'delivery' && (!window.currentOrderId || !window.orderDates || !window.orderDates['order'])) {
+          window.showToast("Bắt buộc phải LƯU ĐƠN ĐẶT HÀNG trước khi xuất Giao Hàng!", "error");
+          return; // Hủy lệnh chuyển tab
+      }
+  }
+
+  if (window.tabItems && window.itemsList) {
+      window.tabItems[window.activeDocMode] = JSON.parse(JSON.stringify(window.itemsList));
+      window.tabNotes[window.activeDocMode] = document.getElementById('docTerms').value;
+  }
+  window.activeDocMode = m; 
+
+  if (!preventReset) {
+      if (!window.tabItems[m]) {
+          if (m === 'order' && window.tabItems['quote']) window.tabItems[m] = JSON.parse(JSON.stringify(window.tabItems['quote']));
+          else if (m === 'delivery' && window.tabItems['order']) window.tabItems[m] = JSON.parse(JSON.stringify(window.tabItems['order']));
+          else if (m === 'delivery' && window.tabItems['quote']) window.tabItems[m] = JSON.parse(JSON.stringify(window.tabItems['quote']));
+          else window.tabItems[m] = [{ name: "", unit: "Cái", qty: 1000, price: 0 }];
+      }
+      if (!window.currentOrderId) { window.currentOrderId = null; window.orderDates = null; }
+  }
+  
+  window.itemsList = JSON.parse(JSON.stringify(window.tabItems[m])); 
+  document.getElementById('docTerms').value = window.tabNotes[m] !== undefined ? window.tabNotes[m] : '';
+  
+  window.initDefaultDocMeta(); window.updateModeUI(); window.renderItemsTable(); window.renderDocPreview(); 
+};
+  
   window.closeOrderModal(); window.showToast(`Đã nạp bộ hồ sơ: ${window.currentOrderId}`, "success");
 };
 
@@ -136,6 +170,23 @@ window.updateModeUI = function() {
       const el = document.getElementById(id); el.readOnly = !isQuote;
       if(!isQuote) el.classList.add('bg-slate-100', 'text-slate-500', 'cursor-not-allowed', 'border-transparent'); else el.classList.remove('bg-slate-100', 'text-slate-500', 'cursor-not-allowed', 'border-transparent');
   });
+
+  // [TỰ ĐỘNG ĐỔI TÊN NÚT LƯU THEO TAB HIỆN TẠI]
+  const saveBtn = document.querySelector('button[onclick="window.saveOrderToCloud()"]');
+  if (saveBtn) {
+      let btnText = window.activeDocMode === 'quote' ? 'Lưu Báo Giá' : (window.activeDocMode === 'order' ? 'Lưu Đặt Hàng' : 'Lưu Giao Hàng');
+      saveBtn.innerHTML = `<i class="fa-solid fa-cloud-arrow-up"></i> ${btnText}`;
+      
+      // Đổi màu nút lưu để dễ phân biệt
+      if (window.activeDocMode === 'order') {
+          saveBtn.className = "px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-bold shadow transition flex items-center gap-2";
+      } else if (window.activeDocMode === 'delivery') {
+          saveBtn.className = "px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-bold shadow transition flex items-center gap-2";
+      } else {
+          saveBtn.className = "px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold shadow transition flex items-center gap-2";
+      }
+  }
+
   window.renderItemsTable(); 
 };
 
