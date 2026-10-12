@@ -37,7 +37,9 @@ window.selectCustomerById = function(id) {
 
 window.loadOrder = (id) => {
   let orders = JSON.parse(window.SafeStore.get('docugen_orders') || '{}'); let o = orders[id]; if(!o) return;
-  window.currentOrderId = id; window.currentOrderDate = o.date; window.switchDocMode(o.mode, false);
+  window.currentOrderId = id; window.currentOrderDate = o.date; 
+  window.switchDocMode(o.mode, true); // ĐỔI THÀNH true Ở ĐÂY ĐỂ NGĂN RESET MÃ PHIẾU
+  
   document.getElementById('custName').value = o.customerName || ''; document.getElementById('custTaxId').value = o.taxId || ''; document.getElementById('custCompanyPhone').value = o.companyPhone || ''; document.getElementById('custEmail').value = o.email || ''; document.getElementById('custAddress').value = o.address || ''; document.getElementById('contactPerson').value = o.contactPerson || ''; document.getElementById('custPhone').value = o.phone || ''; document.getElementById('deliveryAddress').value = o.deliveryAddress || ''; document.getElementById('deliveryTime').value = o.deliveryTime || ''; document.getElementById('sameAddressCheckbox').checked = o.sameAddress || false; document.getElementById('currentCustomerId').value = o.customerId || '';
   window.quoteSumMode = o.quoteSumMode || 'sum'; window.depositType = o.depositType || 'percent'; document.getElementById('depositPercent').value = o.depositPercent || 50; document.getElementById('depositFixedAmountInput').value = o.depositAmount || 0; document.getElementById('vatSelect').value = o.vat !== undefined ? o.vat : "8"; document.getElementById('docTerms').value = o.terms || ''; window.tabNotes[o.mode] = o.terms || '';
   window.tabItems[o.mode] = JSON.parse(JSON.stringify(o.items)); window.itemsList = window.tabItems[o.mode];
