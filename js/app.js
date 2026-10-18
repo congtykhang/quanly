@@ -2,32 +2,38 @@
 // DOCUGEN PRO - GIAO DIỆN & XỬ LÝ CHÍNH (APP.JS)
 // ==========================================
 
-window.activeDocMode = 'quote'; // Mặc định chế độ báo giá
-window.itemsList = [];
+window.activeDocMode = 'quote';
 window.quoteSumMode = 'sum';
 window.depositType = 'percent';
+window.deliveryPaperSize = 'A4';
 window.isCompanyEditing = false;
 window.currentOrderId = null;
-window.currentOrderDate = '';
+window.currentOrderDate = null;
+window.orderDates = null;
 
-// Khởi động toàn bộ ứng dụng khi trang web vừa tải xong
+window.tabNotes = { 
+  quote: "- Báo giá có giá trị trong vòng 15 ngày.\n- Giá trên chưa bao gồm 8% thuế GTGT.\n- Miễn phí giao hàng nội thành TP.HCM.", 
+  order: "- Khách hàng kiểm tra và ký xác nhận duyệt nội dung, màu sắc trước khi sản xuất hàng loạt.\n- Hàng giao tận nơi theo thỏa thuận.", 
+  delivery: "- Quý khách vui lòng kiểm tra kỹ số lượng và chất lượng trước khi nhận hàng.\n- Hàng giao tận nơi theo thỏa thuận." 
+};
+window.tabItems = { quote: null, order: null, delivery: null };
+window.tabItems['quote'] = [ { name: "In tem nhãn Decal giấy (Bế đờ mi, cán màng bóng)", unit: "Tem", qty: 5000, price: 350 }, { name: "In hộp giấy Kraft bế dán thành phẩm", unit: "Hộp", qty: 1000, price: 4500 }, { name: "Thiết kế file in (Miễn phí theo đơn)", unit: "Gói", qty: 1, price: 0 } ];
+window.itemsList = JSON.parse(JSON.stringify(window.tabItems['quote']));
+
+// KHỞI ĐỘNG HỆ THỐNG
 document.addEventListener("DOMContentLoaded", async () => {
   console.log("DocuGen Pro đang khởi động...");
   
-  // Gắn sự kiện các nút chuyển chế độ Báo giá / Đặt hàng / Giao hàng
-  const btnQuote = document.getElementById('tabModeQuote');
-  const btnOrder = document.getElementById('tabModeOrder');
-  const btnDelivery = document.getElementById('tabModeDelivery');
+  const searchCustomerInput = document.getElementById('searchCustomerInput');
+  if (searchCustomerInput) {
+      searchCustomerInput.addEventListener('input', (e) => {
+          if(window.renderCustomerList) window.renderCustomerList(e.target.value);
+      });
+  }
 
-  if(btnQuote) btnQuote.addEventListener('click', () => window.switchDocMode('quote'));
-  if(btnOrder) btnOrder.addEventListener('click', () => window.switchDocMode('order'));
-  if(btnDelivery) btnDelivery.addEventListener('click', () => window.switchDocMode('delivery'));
-
-  // Gọi hàm xác thực đăng nhập từ core.js
   if (window.initAppAuth) {
     await window.initAppAuth();
   } else {
-    // Trường hợp phòng hờ core.js chưa load kịp
     const loadingEl = document.getElementById('authLoadingOverlay');
     if(loadingEl) loadingEl.classList.add('hidden');
     const loginBox = document.getElementById('loginBox');
@@ -35,126 +41,338 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 });
 
-// Chuyển đổi chế độ phiếu và cập nhật giao diện
-window.switchDocMode = function(mode) {
-  window.activeDocMode = mode;
+window.processAI = () => {
+  if (window.activeDocMode !== 'quote') { window.showToast("AI chỉ hỗ trợ phân tích khi đang lập Báo giá mới!", "error"); return; }
+  const prompt = document.getElementById('aiPromptInput').value.trim(); const apiKey = window.SafeStore.get('docugen_cfg_ai'); const statusMsg = document.getElementById('aiStatusMsg');
+  if(!prompt) { window.showToast("Anh dán tin nhắn vô ô trống trước đã nghen!", "error"); return; }
+  if(!apiKey) { statusMsg.innerHTML = '<span class="text-rose-600 font-bold">Chưa có mã API Key! Anh vô phần Cài đặt thêm vô nghen.</span>'; return; }
   
-  const btnQuote = document.getElementById('tabModeQuote');
-  const btnOrder = document.getElementById('tabModeOrder');
-  const btnDelivery = document.getElementById('tabModeDelivery');
-  
-  if(btnQuote) btnQuote.className = mode === 'quote' ? 'px-4 py-2 bg-blue-600 text-white font-bold rounded-lg shadow' : 'px-4 py-2 bg-slate-200 text-slate-700 rounded-lg';
-  if(btnOrder) btnOrder.className = mode === 'order' ? 'px-4 py-2 bg-indigo-600 text-white font-bold rounded-lg shadow' : 'px-4 py-2 bg-slate-200 text-slate-700 rounded-lg';
-  if(btnDelivery) btnDelivery.className = mode === 'delivery' ? 'px-4 py-2 bg-emerald-600 text-white font-bold rounded-lg shadow' : 'px-4 py-2 bg-slate-200 text-slate-700 rounded-lg';
+  statusMsg.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang nhờ AI đọc hiểu... (Demo Mode)';
+  setTimeout(() => {
+    statusMsg.innerHTML = '<span class="text-emerald-600 font-bold">Đã phân tích xong! Anh dò lại form nghen.</span>';
+    window.showToast("Nhập liệu AI thành công", "success");
+    document.getElementById('custName').value = "KHÁCH HÀNG TỪ ZALO"; document.getElementById('custPhone').value = "0988 777 666";
+    window.renderDocPreview();
+  }, 1500);
+};
 
-  if (window.updateModeUI) window.updateModeUI();
-  if (window.renderDocPreview) window.renderDocPreview();
+// ĐÃ GỘP: Hàm chọn khách hàng có xóa rác dữ liệu
+window.selectCustomerById = function(id) {
+  if (window.activeDocMode !== 'quote') { window.showToast("Chỉ có thể chọn khách hàng ở Tab Báo Giá", "error"); return; }
+  let custData = JSON.parse(window.SafeStore.get('docugen_customers') || '{}'); const c = custData[id]; if(!c) return;
+  
+  const setVal = (elmId, val) => { const el = document.getElementById(elmId); if(el) el.value = val || ''; };
+  setVal('currentCustomerId', id);
+  setVal('custName', c.name);
+  setVal('custTaxId', c.taxId);
+  setVal('custCompanyPhone', c.companyPhone);
+  setVal('custEmail', c.email);
+  setVal('custAddress', c.address);
+  setVal('contactPerson', c.contactPerson);
+  setVal('custPhone', c.phone);
+  setVal('deliveryAddress', c.deliveryAddress);
+  setVal('deliveryTime', c.deliveryTime);
+  
+  const sameAddr = document.getElementById('sameAddressCheckbox');
+  if(sameAddr) sameAddr.checked = !!c.sameAddress;
+
+  if(window.toggleSameDeliveryAddress) window.toggleSameDeliveryAddress(); 
+  window.renderDocPreview(); 
+  if(window.closeCustomerModal) window.closeCustomerModal(); 
+  window.showToast("Đã nạp thông tin KH", "success");
+};
+
+// ĐÃ GỘP: Hàm nạp đơn hàng có xóa rác và đẩy đủ dữ liệu các tab
+window.loadOrder = (id) => {
+  let orders = JSON.parse(window.SafeStore.get('docugen_orders') || '{}'); let o = orders[id]; if(!o) return;
+  
+  window.currentOrderId = o.baseId || id;
+  if (window.currentOrderId.includes('-') && (window.currentOrderId.startsWith('BG-') || window.currentOrderId.startsWith('ĐH-') || window.currentOrderId.startsWith('GH-'))) {
+      window.currentOrderId = window.currentOrderId.substring(3); 
+  }
+  window.orderDates = o.orderDates || { quote: o.date, order: null, delivery: null };
+  
+  if (o.tabItems) window.tabItems = JSON.parse(JSON.stringify(o.tabItems));
+  else { window.tabItems = { quote: null, order: null, delivery: null }; window.tabItems[o.mode || 'quote'] = JSON.parse(JSON.stringify(o.items)); }
+
+  if (o.tabNotes) window.tabNotes = JSON.parse(JSON.stringify(o.tabNotes));
+  else {
+      window.tabNotes = { quote: "- Báo giá có giá trị trong vòng 15 ngày.\n- Giá trên chưa bao gồm 8% thuế GTGT.\n- Miễn phí giao hàng nội thành TP.HCM.", order: "- Khách hàng kiểm tra và ký xác nhận duyệt nội dung, màu sắc trước khi sản xuất hàng loạt.\n- Hàng giao tận nơi theo thỏa thuận.", delivery: "- Quý khách vui lòng kiểm tra kỹ số lượng và chất lượng trước khi nhận hàng.\n- Hàng giao tận nơi theo thỏa thuận." };
+      window.tabNotes[o.mode || 'quote'] = o.terms || '';
+  }
+
+  const setVal = (elmId, val) => { const el = document.getElementById(elmId); if(el) el.value = val || ''; };
+  setVal('custName', o.customerName);
+  setVal('custTaxId', o.taxId);
+  setVal('custCompanyPhone', o.companyPhone);
+  setVal('custEmail', o.email);
+  setVal('custAddress', o.address);
+  setVal('contactPerson', o.contactPerson);
+  setVal('custPhone', o.phone);
+  setVal('deliveryAddress', o.deliveryAddress);
+  setVal('deliveryTime', o.deliveryTime);
+  setVal('currentCustomerId', o.customerId);
+  
+  const sameAddr = document.getElementById('sameAddressCheckbox');
+  if(sameAddr) sameAddr.checked = !!o.sameAddress;
+
+  window.quoteSumMode = o.quoteSumMode || 'sum'; 
+  window.depositType = o.depositType || 'percent'; 
+  setVal('depositPercent', o.depositPercent || 50); 
+  setVal('depositFixedAmountInput', o.depositAmount || 0); 
+  setVal('vatSelect', o.vat !== undefined ? o.vat : "8"); 
+  
+  window.switchDocMode(o.mode || 'quote', true);
+  
+  if(window.closeOrderModal) window.closeOrderModal(); 
+  window.showToast(`Đã nạp bộ hồ sơ: ${id}`, "success");
 };
 
 window.initDefaultDocMeta = function() {
-  const now = new Date();
-  const pfx = window.activeDocMode === 'quote' ? 'BG' : (window.activeDocMode === 'order' ? 'ĐH' : 'GH');
-  window.currentOrderId = `${pfx}-${now.getFullYear()}${String(now.getDate()).padStart(2,'0')}${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
-  window.currentOrderDate = now.toLocaleDateString('vi-VN');
+  const now = new Date(); const docInput = document.getElementById('docNumberInput');
+  if (!window.currentOrderId) { 
+      if(docInput) { docInput.value = "Sẽ cấp tự động khi Lưu"; docInput.classList.add('text-amber-600', 'italic', 'text-xs'); docInput.classList.remove('text-blue-700', 'font-bold', 'text-sm'); }
+      const dateInp = document.getElementById('docDateInput'); if(dateInp) dateInp.value = now.toLocaleDateString('vi-VN');
+  } 
+  else { 
+      const pfx = window.activeDocMode === 'quote' ? 'BG' : (window.activeDocMode === 'order' ? 'ĐH' : 'GH');
+      if(docInput) { docInput.value = `${pfx}-${window.currentOrderId}`; docInput.classList.remove('text-amber-600', 'italic', 'text-xs'); docInput.classList.add('text-blue-700', 'font-bold', 'text-sm'); }
+      
+      let docDate = now.toLocaleDateString('vi-VN');
+      if (window.orderDates && window.orderDates[window.activeDocMode]) docDate = window.orderDates[window.activeDocMode];
+      const dateInp = document.getElementById('docDateInput'); if(dateInp) dateInp.value = docDate;
+  }
 };
+
+window.switchDocMode = (m, preventReset = false) => { 
+  if (!preventReset && m !== window.activeDocMode) {
+      if (m === 'order' && (!window.currentOrderId || !window.orderDates || !window.orderDates['quote'])) {
+          window.showToast("Bắt buộc phải LƯU BÁO GIÁ trước khi lên Đơn Đặt Hàng!", "error");
+          return; 
+      }
+      if (m === 'delivery' && (!window.currentOrderId || !window.orderDates || !window.orderDates['order'])) {
+          window.showToast("Bắt buộc phải LƯU ĐƠN ĐẶT HÀNG trước khi xuất Giao Hàng!", "error");
+          return; 
+      }
+  }
+
+  if (window.tabItems && window.itemsList) {
+      window.tabItems[window.activeDocMode] = JSON.parse(JSON.stringify(window.itemsList));
+      const termsEl = document.getElementById('docTerms'); if(termsEl) window.tabNotes[window.activeDocMode] = termsEl.value;
+  }
+  window.activeDocMode = m; 
+
+  if (!preventReset) {
+      if (!window.tabItems[m]) {
+          if (m === 'order' && window.tabItems['quote']) window.tabItems[m] = JSON.parse(JSON.stringify(window.tabItems['quote']));
+          else if (m === 'delivery' && window.tabItems['order']) window.tabItems[m] = JSON.parse(JSON.stringify(window.tabItems['order']));
+          else if (m === 'delivery' && window.tabItems['quote']) window.tabItems[m] = JSON.parse(JSON.stringify(window.tabItems['quote']));
+          else window.tabItems[m] = [{ name: "", unit: "Cái", qty: 1000, price: 0 }];
+      }
+      if (!window.currentOrderId) { window.currentOrderId = null; window.orderDates = null; }
+  }
+  
+  window.itemsList = JSON.parse(JSON.stringify(window.tabItems[m] || [])); 
+  const tEl = document.getElementById('docTerms'); if(tEl) tEl.value = window.tabNotes[m] !== undefined ? window.tabNotes[m] : '';
+  
+  window.initDefaultDocMeta(); window.updateModeUI(); window.renderItemsTable(); window.renderDocPreview(); 
+};
+
+window.updateTerms = (val) => { window.tabNotes[window.activeDocMode] = val; window.renderDocPreview(); };
+window.setQuoteSumMode = (m) => { window.quoteSumMode = m; window.updateModeUI(); window.renderDocPreview(); };
+window.setDepositType = (t) => { window.depositType = t; window.updateModeUI(); window.renderDocPreview(); };
+window.setDeliveryPaperSize = (s) => { window.deliveryPaperSize = s; window.updateModeUI(); window.renderDocPreview(); };
 
 window.updateModeUI = function() {
-  const titleEl = document.getElementById('docMainTitle');
-  if(titleEl) {
-    titleEl.innerText = window.activeDocMode === 'quote' ? 'BẢNG BÁO GIÁ' : (window.activeDocMode === 'order' ? 'ĐƠN ĐẶT HÀNG' : 'PHIẾU GIAO HÀNG');
-  }
-};
-
-window.renderDocPreview = function() {
-  const totalEl = document.getElementById('displayGrandTotal');
-  if(totalEl && window.itemsList) {
-    let sum = window.itemsList.reduce((acc, item) => acc + (Number(item.total) || 0), 0);
-    totalEl.innerText = sum.toLocaleString('vi-VN') + ' đ';
-  }
-};
-
-// Đã fix: Xóa sạch BÀN LÀM VIỆC khi tạo phiếu mới
-window.resetCustomerForm = function() {
-  window.currentOrderId = null;
-  window.itemsList = [];
+  ['quote', 'order', 'delivery'].forEach(m => {
+    const btn = document.getElementById(`docTabBtn_${m}`);
+    if(btn) btn.className = m === window.activeDocMode ? "px-3 sm:px-5 py-2 rounded-lg text-xs sm:text-sm font-bold transition flex items-center justify-center gap-1.5 bg-blue-600 text-white shadow-sm" : "px-3 sm:px-5 py-2 rounded-lg text-xs sm:text-sm font-bold transition flex items-center justify-center gap-1.5 text-slate-600 hover:text-slate-900 hover:bg-white/70";
+    const cfg = document.getElementById(`modeConfig_${m}`);
+    if(cfg) cfg.classList.toggle('hidden', m !== window.activeDocMode);
+  });
   
-  const textFields = ['currentCustomerId', 'custName', 'custPhone', 'custAddress', 'custTaxId', 'custCompanyPhone', 'custEmail', 'contactPerson', 'deliveryAddress', 'deliveryTime'];
-  textFields.forEach(id => {
-    const el = document.getElementById(id);
-    if(el) el.value = '';
+  const isNoSum = (window.activeDocMode === 'quote' && window.quoteSumMode === 'options');
+  const finPanel = document.getElementById('financialSummaryPanel'); if(finPanel) finPanel.classList.toggle('hidden', isNoSum); 
+  const noSumPanel = document.getElementById('noSumSummaryBanner'); if(noSumPanel) noSumPanel.classList.toggle('hidden', !isNoSum);
+  const depBlock = document.getElementById('depositBlockUI'); if(depBlock) depBlock.classList.toggle('hidden', window.activeDocMode === 'quote');
+  const depPctBox = document.getElementById('depositPercentBox'); if(depPctBox) depPctBox.classList.toggle('hidden', window.depositType !== 'percent'); 
+  const depAmtBox = document.getElementById('depositAmountBox'); if(depAmtBox) depAmtBox.classList.toggle('hidden', window.depositType === 'percent');
+  
+  const btnPct = document.getElementById('depModeBtn_percent'); const btnAmt = document.getElementById('depModeBtn_amount');
+  if(window.depositType === 'percent'){ if(btnPct) btnPct.className = "px-2 py-1 bg-white font-bold rounded shadow-sm text-blue-700 transition"; if(btnAmt) btnAmt.className = "px-2 py-1 text-slate-600 font-bold transition"; }
+  else { if(btnAmt) btnAmt.className = "px-2 py-1 bg-white font-bold rounded shadow-sm text-blue-700 transition"; if(btnPct) btnPct.className = "px-2 py-1 text-slate-600 font-bold transition"; }
+
+  const isQuote = window.activeDocMode === 'quote';
+  const lockOl = document.getElementById('customerLockOverlay'); if(lockOl) lockOl.classList.toggle('hidden', isQuote); 
+  const actBtns = document.getElementById('customerActionButtons'); if(actBtns) actBtns.classList.toggle('hidden', !isQuote); 
+  const aiBlock = document.getElementById('aiInputBlock'); if(aiBlock) aiBlock.classList.toggle('hidden', !isQuote); 
+  const chkSame = document.getElementById('sameAddressCheckbox'); if(chkSame) chkSame.disabled = !isQuote;
+
+  const titleEl = document.getElementById('docMainTitle');
+  if(titleEl) titleEl.innerText = window.activeDocMode === 'quote' ? 'BẢNG BÁO GIÁ' : (window.activeDocMode === 'order' ? 'ĐƠN ĐẶT HÀNG' : 'PHIẾU GIAO HÀNG');
+
+  ['custName','custTaxId','custCompanyPhone','custEmail','custAddress','contactPerson','custPhone','deliveryAddress','deliveryTime'].forEach(id => {
+      const el = document.getElementById(id); 
+      if(el) {
+        el.readOnly = !isQuote;
+        if(!isQuote) el.classList.add('bg-slate-100', 'text-slate-500', 'cursor-not-allowed', 'border-transparent'); 
+        else el.classList.remove('bg-slate-100', 'text-slate-500', 'cursor-not-allowed', 'border-transparent');
+      }
   });
 
-  const sameAddr = document.getElementById('sameAddressCheckbox');
-  if(sameAddr) sameAddr.checked = false;
+  const saveBtn = document.querySelector('button[onclick="window.saveOrderToCloud()"]');
+  if (saveBtn) {
+      let btnText = window.activeDocMode === 'quote' ? 'Lưu Báo Giá' : (window.activeDocMode === 'order' ? 'Lưu Đặt Hàng' : 'Lưu Giao Hàng');
+      saveBtn.innerHTML = `<i class="fa-solid fa-cloud-arrow-up"></i> ${btnText}`;
+      if (window.activeDocMode === 'order') saveBtn.className = "px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-bold shadow transition flex items-center gap-2";
+      else if (window.activeDocMode === 'delivery') saveBtn.className = "px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-bold shadow transition flex items-center gap-2";
+      else saveBtn.className = "px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold shadow transition flex items-center gap-2";
+  }
+};
 
-  const vat = document.getElementById('vatSelect');
-  if(vat) vat.value = '0';
-  
-  const depPct = document.getElementById('depositPercent');
-  if(depPct) depPct.value = '0';
-  
-  const depAmt = document.getElementById('depositFixedAmountInput');
-  if(depAmt) depAmt.value = '0';
+window.toggleSameDeliveryAddress = () => { if(window.activeDocMode !== 'quote') return; const chk = document.getElementById('sameAddressCheckbox'); const d = document.getElementById('deliveryAddress'); const cAdd = document.getElementById('custAddress'); if(!chk || !d || !cAdd) return; if(chk.checked) { d.value = cAdd.value; d.readOnly = true; d.classList.add('bg-slate-100'); } else { d.readOnly = false; d.classList.remove('bg-slate-100'); } window.renderDocPreview(); };
+window.handleCompanyAddressInput = () => { const chk = document.getElementById('sameAddressCheckbox'); const d = document.getElementById('deliveryAddress'); const cAdd = document.getElementById('custAddress'); if(chk && chk.checked && d && cAdd) { d.value = cAdd.value; window.renderDocPreview(); } };
 
-  window.initDefaultDocMeta();
+// ĐÃ GỘP: Reset trắng bóc tạo phiếu mới
+window.resetCustomerForm = () => {
+  window.currentOrderId = null; window.orderDates = null;
+  ['currentCustomerId','custName','custTaxId','custCompanyPhone','custEmail','custAddress','contactPerson','custPhone','deliveryAddress', 'deliveryTime'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+  
+  const chk = document.getElementById('sameAddressCheckbox'); if(chk) chk.checked = false;
+  const vat = document.getElementById('vatSelect'); if(vat) vat.value = '8';
+  const dpP = document.getElementById('depositPercent'); if(dpP) dpP.value = '50';
+  const dpA = document.getElementById('depositFixedAmountInput'); if(dpA) dpA.value = '0';
+
+  window.tabItems = { quote: null, order: null, delivery: null }; window.tabItems[window.activeDocMode] = [{ name: "", unit: "Cái", qty: 1, price: 0 }]; window.itemsList = JSON.parse(JSON.stringify(window.tabItems[window.activeDocMode]));
+  window.tabNotes = { quote: "- Báo giá có giá trị trong vòng 15 ngày.\n- Giá trên chưa bao gồm 8% thuế GTGT.\n- Miễn phí giao hàng nội thành TP.HCM.", order: "- Khách hàng kiểm tra và ký xác nhận duyệt nội dung, màu sắc trước khi sản xuất hàng loạt.\n- Hàng giao tận nơi theo thỏa thuận.", delivery: "- Quý khách vui lòng kiểm tra kỹ số lượng và chất lượng trước khi nhận hàng.\n- Hàng giao tận nơi theo thỏa thuận." };
+  
+  const tEl = document.getElementById('docTerms'); if(tEl) tEl.value = window.tabNotes[window.activeDocMode];
+  window.initDefaultDocMeta(); window.renderItemsTable(); window.renderDocPreview(); window.showToast("Đã tạo form mới", "info");
+};
+
+window.renderItemsTable = function() {
+  const tbody = document.getElementById('itemsTableBody'); if(!tbody) return; tbody.innerHTML = ''; const isPriceReadOnly = window.activeDocMode !== 'quote';
+  window.itemsList.forEach((it, i) => {
+    const priceInputHtml = isPriceReadOnly ? `<div class="relative w-full"><i class="fa-solid fa-lock absolute left-2 top-2 text-slate-400 text-[9px]"></i><input type="number" value="${it.price}" readonly class="w-full text-right pl-5 bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200 rounded p-1 text-xs font-mono"></div>` : `<input type="number" value="${it.price}" oninput="window.updateItem(${i}, 'price', this)" class="w-full text-right bg-transparent text-blue-700 border border-slate-300 rounded p-1 text-xs font-mono font-bold outline-none focus:ring-1 focus:ring-blue-500">`;
+    tbody.innerHTML += `<tr class="hover:bg-slate-50 border-b border-slate-100 transition-colors"><td class="p-2 text-center font-bold text-slate-400">${i+1}</td><td class="p-2"><input type="text" value="${it.name}" oninput="window.updateItem(${i}, 'name', this)" class="w-full bg-transparent border border-slate-300 rounded p-1 text-xs outline-none focus:ring-1 focus:ring-blue-500"></td><td class="p-2"><input type="text" value="${it.unit}" oninput="window.updateItem(${i}, 'unit', this)" class="w-full text-center bg-transparent border border-slate-300 rounded p-1 text-xs outline-none focus:ring-1 focus:ring-blue-500"></td><td class="p-2"><input type="number" value="${it.qty}" oninput="window.updateItem(${i}, 'qty', this)" class="w-full text-right bg-transparent border border-slate-300 rounded p-1 text-xs outline-none focus:ring-1 focus:ring-blue-500"></td><td class="p-2">${priceInputHtml}</td><td class="p-2 text-right font-mono font-bold text-slate-700" id="rowTotal_${i}">${Math.round(it.qty*it.price).toLocaleString('vi-VN')}</td><td class="p-2 text-center"><button onclick="window.removeItemRow(${i})" class="text-rose-400 hover:text-rose-600 transition"><i class="fa-solid fa-xmark"></i></button></td></tr>`;
+  });
   window.renderDocPreview();
 };
 
-// Đã fix: Ép ghi đè toàn bộ dữ liệu khi xem lại Đơn hàng cũ
-window.loadOrder = function(orderId) {
-  let orders = JSON.parse(window.SafeStore.get('docugen_orders') || '{}');
-  let o = orders[orderId];
-  if(!o) return;
+window.updateItem = (i, f, el) => { window.itemsList[i][f] = (f==='qty'||f==='price') ? parseFloat(el.value)||0 : el.value; if(f === 'qty' || f === 'price') { const rowTotalEl = document.getElementById(`rowTotal_${i}`); if(rowTotalEl) rowTotalEl.innerText = Math.round(window.itemsList[i].qty * window.itemsList[i].price).toLocaleString('vi-VN'); } window.renderDocPreview(); };
+window.addItemRow = () => { window.itemsList.push({name:"", unit:"Cái", qty:1000, price:0}); window.renderItemsTable(); };
+window.removeItemRow = (i) => { window.itemsList.splice(i, 1); window.renderItemsTable(); };
+window.handleDepositAmountTyping = (el) => { const val = parseInt(el.value.replace(/[^\d]/g, ''))||0; el.value = val.toLocaleString('vi-VN'); window.renderDocPreview(); };
+
+function docTienBangChu(amount) {
+  const num = Math.round(Number(amount) || 0); if (num <= 0) return "Không đồng chẵn.";
+  const digits = ["không", "một", "hai", "ba", "bốn", "năm", "sáu", "bảy", "tám", "chín"]; const units = ["", "nghìn", "triệu", "tỷ", "nghìn tỷ"];
+  function readTriple(triple, showZeroHundred) {
+    const h = Math.floor(triple / 100); const t = Math.floor((triple % 100) / 10); const u = triple % 10; let res = "";
+    if (h > 0 || showZeroHundred) res += digits[h] + " trăm ";
+    if (t > 1) { res += digits[t] + " mươi "; if (u === 1) res += "mốt "; else if (u === 4) res += "tư "; else if (u === 5) res += "lăm "; else if (u > 0) res += digits[u] + " "; }
+    else if (t === 1) { res += "mười "; if (u === 5) res += "lăm "; else if (u > 0) res += digits[u] + " "; }
+    else if (t === 0 && u > 0) { if (h > 0 || showZeroHundred) res += "lẻ " + digits[u] + " "; else res += digits[u] + " "; } return res.trim();
+  }
+  const groups = []; let temp = num; while (temp > 0) { groups.push(temp % 1000); temp = Math.floor(temp / 1000); } let result = "";
+  for (let i = groups.length - 1; i >= 0; i--) { if (groups[i] > 0) result += readTriple(groups[i], i < groups.length - 1) + (units[i] ? " " + units[i] : "") + " "; }
+  result = result.trim().replace(/\s+/g, ' '); return result.charAt(0).toUpperCase() + result.slice(1) + " đồng chẵn.";
+}
+
+window.renderDocPreview = function() {
+  const pDoc = document.getElementById('printDocument'); if(!pDoc) return;
+  let subtotal = 0; window.itemsList.forEach(it => subtotal += (it.qty*it.price));
   
-  window.currentOrderId = orderId;
-  window.activeDocMode = o.mode || 'quote';
-  window.switchDocMode(window.activeDocMode);
+  const vatEl = document.getElementById('vatSelect'); const vatVal = vatEl ? parseFloat(vatEl.value) : 0; 
+  const vatAmount = vatVal > 0 ? Math.round(subtotal * (vatVal/100)) : 0; const grandTotal = subtotal + vatAmount;
   
-  if(document.getElementById('currentCustomerId')) document.getElementById('currentCustomerId').value = o.customerId || '';
-  if(document.getElementById('custName')) document.getElementById('custName').value = o.customerName || '';
-  if(document.getElementById('custPhone')) document.getElementById('custPhone').value = o.phone || '';
-  if(document.getElementById('custAddress')) document.getElementById('custAddress').value = o.address || '';
-  if(document.getElementById('custTaxId')) document.getElementById('custTaxId').value = o.taxId || '';
-  if(document.getElementById('custCompanyPhone')) document.getElementById('custCompanyPhone').value = o.companyPhone || '';
-  if(document.getElementById('custEmail')) document.getElementById('custEmail').value = o.email || '';
-  if(document.getElementById('contactPerson')) document.getElementById('contactPerson').value = o.contactPerson || '';
-  if(document.getElementById('deliveryAddress')) document.getElementById('deliveryAddress').value = o.deliveryAddress || '';
-  if(document.getElementById('deliveryTime')) document.getElementById('deliveryTime').value = o.deliveryTime || '';
-  if(document.getElementById('sameAddressCheckbox')) document.getElementById('sameAddressCheckbox').checked = !!o.sameAddress;
+  const dpPctEl = document.getElementById('depositPercent'); const dpAmtEl = document.getElementById('depositFixedAmountInput');
+  let depAmount = window.depositType === 'percent' ? Math.round(grandTotal * ((parseFloat(dpPctEl?dpPctEl.value:0)||0)/100)) : parseInt((dpAmtEl?dpAmtEl.value:'0').replace(/[^\d]/g,''))||0;
+  const remain = Math.max(0, grandTotal - depAmount);
+
+  const setHtml = (id, html) => { const el = document.getElementById(id); if(el) el.innerHTML = html; };
+  setHtml('displaySubtotal', subtotal.toLocaleString('vi-VN') + ' đ'); setHtml('displayVatAmount', vatAmount.toLocaleString('vi-VN') + ' đ');
+  setHtml('displayGrandTotal', grandTotal.toLocaleString('vi-VN') + ' đ'); setHtml('displayDepositAmount', depAmount.toLocaleString('vi-VN') + ' đ'); setHtml('displayRemainingAmount', remain.toLocaleString('vi-VN') + ' đ');
   
-  if(document.getElementById('vatSelect')) document.getElementById('vatSelect').value = o.vat || 0;
-  if(document.getElementById('docTerms')) document.getElementById('docTerms').value = o.terms || '';
-  if(document.getElementById('depositPercent')) document.getElementById('depositPercent').value = o.depositPercent || 0;
-  if(document.getElementById('depositFixedAmountInput')) document.getElementById('depositFixedAmountInput').value = o.depositAmount || 0;
+  let amountToSpell = grandTotal; if (window.activeDocMode === 'order' || window.activeDocMode === 'delivery') amountToSpell = remain;
+  const totalWords = docTienBangChu(amountToSpell);
+  setHtml('displayAmountWords', totalWords); setHtml('displayDepositWords', docTienBangChu(depAmount));
+
+  const pSize = window.activeDocMode === 'delivery' ? window.deliveryPaperSize : (window.activeDocMode === 'order' && window.deliveryPaperSize ? window.deliveryPaperSize : 'A4');
+  const dps = document.getElementById('dynamicPagePrintStyle'); const ppsb = document.getElementById('previewPaperSizeBadge');
+  if(pSize === 'A6-portrait') { pDoc.className = 'a6-portrait-sheet font-document text-black'; if(dps) dps.innerHTML = '@page { size: A6 portrait; margin: 0; }'; if(ppsb) ppsb.innerText = 'Khổ A6 (In xưởng)'; } else if(pSize === 'A5-landscape') { pDoc.className = 'a5-landscape-sheet font-document text-black'; if(dps) dps.innerHTML = '@page { size: A5 landscape; margin: 0; }'; if(ppsb) ppsb.innerText = 'Khổ A5 Ngang'; } else if(pSize === 'A5-portrait') { pDoc.className = 'a5-portrait-sheet font-document text-black'; if(dps) dps.innerHTML = '@page { size: A5 portrait; margin: 0; }'; if(ppsb) ppsb.innerText = 'Khổ A5 Đứng'; } else { pDoc.className = 'a4-sheet font-document text-black'; if(dps) dps.innerHTML = '@page { size: A4 portrait; margin: 0; }'; if(ppsb) ppsb.innerText = 'Khổ A4'; }
+
+  const cNameEl = document.getElementById('custName'); const cName = cNameEl && cNameEl.value.trim() ? cNameEl.value.trim() : '...........................................'; const taxLines = [];
+  ['custTaxId','custCompanyPhone','custEmail'].forEach(id => { const el = document.getElementById(id); const val = el ? el.value.trim() : ''; if(val) taxLines.push(id==='custTaxId'?`<strong>MST:</strong> ${val}`:id==='custCompanyPhone'?`<strong>SĐT:</strong> ${val}`:`<strong>Email:</strong> ${val}`); });
   
-  window.quoteSumMode = o.quoteSumMode || 'sum';
-  window.depositType = o.depositType || 'percent';
+  const getVal = (id, def) => { const el = document.getElementById(id); return el ? el.value : def; };
+  const sName = getVal('sellerName', window.DEFAULT_COMPANY.name); const sAdd = getVal('sellerAddress', window.DEFAULT_COMPANY.address); const sBranch = getVal('sellerBranch', window.DEFAULT_COMPANY.branch); const sHotline = getVal('sellerPhone', window.DEFAULT_COMPANY.phone); const sTax = getVal('sellerTaxCode', window.DEFAULT_COMPANY.taxCode);
+  const creatorName = getVal('docCreatorInput', window.currentAppFullName); 
+  const dTitleSel = document.getElementById('deliveryTitleSelect');
+  let title = window.activeDocMode === 'quote' ? 'BẢNG BÁO GIÁ' : (window.activeDocMode === 'order' ? 'ĐƠN ĐẶT HÀNG' : (dTitleSel?dTitleSel.value:'PHIẾU GIAO HÀNG'));
   
-  window.itemsList = o.items || [];
-  window.renderDocPreview();
+  const dpCheck = document.getElementById('deliveryShowPriceCheckbox');
+  const hidePrice = (window.activeDocMode === 'delivery' && dpCheck && !dpCheck.checked) || pSize === 'A6-portrait'; const isNoSum = (window.activeDocMode === 'quote' && window.quoteSumMode === 'options');
   
-  if(window.closeOrderModal) window.closeOrderModal();
-  if(window.showToast) window.showToast(`Đã tải Phiếu: ${orderId}`, "success");
+  const isA6 = pSize === 'A6-portrait'; const isA5P = pSize === 'A5-portrait'; const isA5 = pSize !== 'A4' && !isA6;
+  const fontT = isA6 ? '14px' : (isA5P ? '16px' : (isA5 ? '18px' : '21px')); const fontBase = isA6 ? '9px' : (isA5P ? '10.5px' : (isA5 ? '12px' : '13.5px')); const cellP = isA6 ? '2px 3px' : (isA5P ? '3px 4px' : '6px 8px');
+
+  let tbodyStr = '';
+  window.itemsList.forEach((it, i) => {
+    if(hidePrice) { tbodyStr += `<tr><td style="border:1px solid #000;text-align:center;padding:${cellP}">${i+1}</td><td style="border:1px solid #000;padding:${cellP}"><strong>${it.name}</strong></td><td style="border:1px solid #000;text-align:center;padding:${cellP}">${it.unit}</td><td style="border:1px solid #000;text-align:center;padding:${cellP}">${it.qty.toLocaleString('vi-VN')}</td>${isA6 ? '' : `<td style="border:1px solid #000;padding:${cellP}"></td>`}</tr>`; }
+    else { tbodyStr += `<tr><td style="border:1px solid #000;text-align:center;padding:${cellP}">${i+1}</td><td style="border:1px solid #000;padding:${cellP}"><strong>${it.name}</strong></td><td style="border:1px solid #000;text-align:center;padding:${cellP}">${it.unit}</td><td style="border:1px solid #000;text-align:center;padding:${cellP}">${it.qty.toLocaleString('vi-VN')}</td><td style="border:1px solid #000;text-align:right;padding:${cellP}">${it.price.toLocaleString('vi-VN')}</td><td style="border:1px solid #000;text-align:right;font-weight:bold;padding:${cellP}">${Math.round(it.qty*it.price).toLocaleString('vi-VN')}</td></tr>`; }
+  });
+  
+  const tEl = document.getElementById('docTerms');
+  const termsText = tEl ? tEl.value.trim() : ''; const termsHtml = termsText ? `<div style="margin-bottom:15px; white-space: pre-wrap; font-size:${isA6?'9px':(isA5?'11px':'13px')};"><strong>Ghi chú:</strong><br>${termsText}</div>` : '';
+  
+  if(!hidePrice && !isNoSum && !isA6) {
+    if(vatVal > 0) tbodyStr += `<tr><td colspan="5" style="border:1px solid #000;text-align:right;font-weight:bold;padding:${cellP}">Cộng tiền hàng:</td><td style="border:1px solid #000;text-align:right;font-weight:bold;padding:${cellP}">${subtotal.toLocaleString('vi-VN')}</td></tr><tr><td colspan="5" style="border:1px solid #000;text-align:right;font-weight:bold;padding:${cellP}">Thuế VAT (${vatVal}%):</td><td style="border:1px solid #000;text-align:right;font-weight:bold;padding:${cellP}">${vatAmount.toLocaleString('vi-VN')}</td></tr>`;
+    tbodyStr += `<tr><td colspan="5" style="border:1px solid #000;text-align:right;font-weight:bold;font-size:${isA5?'11px':'14px'};padding:${cellP};color:#b91c1c;">TỔNG CỘNG THANH TOÁN:</td><td style="border:1px solid #000;text-align:right;font-weight:bold;font-size:${isA5?'11px':'14px'};padding:${cellP};color:#b91c1c;">${grandTotal.toLocaleString('vi-VN')} đ</td></tr>`;
+    if(depAmount > 0 && window.activeDocMode !== 'delivery' && window.activeDocMode !== 'quote') { tbodyStr += `<tr><td colspan="5" style="border:1px solid #000;text-align:right;font-weight:bold;padding:${cellP}">Đặt cọc trước:</td><td style="border:1px solid #000;text-align:right;font-weight:bold;color:#1e3a8a;padding:${cellP}">${depAmount.toLocaleString('vi-VN')} đ</td></tr><tr><td colspan="5" style="border:1px solid #000;text-align:right;font-weight:bold;padding:${cellP}">Còn lại:</td><td style="border:1px solid #000;text-align:right;font-weight:bold;color:#b91c1c;padding:${cellP}">${remain.toLocaleString('vi-VN')} đ</td></tr>`; }
+  }
+  
+  let headerHtml = '';
+  const numInp = document.getElementById('docNumberInput'); const dateInp = document.getElementById('docDateInput');
+  const dNum = numInp ? numInp.value : ''; const dDate = dateInp ? dateInp.value : '';
+
+  if(isA6) { headerHtml = `<div style="border-bottom: 1px solid #1e3a8a; padding-bottom: 4px; margin-bottom: 6px; text-align:center;"><div style="font-size:10px; font-weight:bold; color:#1e3a8a;">${sName}</div><div style="font-size:8px;"><strong>Hotline:</strong> <span style="color:#b91c1c;font-weight:bold;">${sHotline}</span></div></div><table style="width:100%; font-size:8px; margin-bottom:4px;"><tr><td style="text-align:left;"><strong>Số:</strong> ${dNum}</td><td style="text-align:right;"><strong>Ngày:</strong> ${dDate}</td></tr></table>`; } 
+  else { headerHtml = `<div style="border-bottom: 2px solid #1e3a8a; padding-bottom: 8px; margin-bottom: 10px;"><table style="width:100%;"><tr><td style="width:70%;vertical-align:top;"><div style="font-size:${isA5P?'12px':'15px'}; font-weight:bold; color:#1e3a8a;">${sName}</div><div><strong>Địa chỉ:</strong> ${sAdd}</div>${sBranch ? `<div><strong>Chi nhánh:</strong> ${sBranch}</div>` : ''}<div><strong>Hotline:</strong> <span style="color:#b91c1c;font-weight:bold;">${sHotline}</span> | <strong>MST:</strong> ${sTax}</div></td><td style="width:30%;vertical-align:top;text-align:right;"><div style="border:1px solid #ccc; padding:4px; border-radius:4px; text-align:left; display:inline-block;"><div><strong>Số:</strong> ${dNum}</div><div><strong>Ngày:</strong> ${dDate}</div></div></td></tr></table></div>`; }
+  
+  pDoc.innerHTML = `
+    <div style="font-size:${fontBase}; line-height:1.4;">
+      ${headerHtml}
+      <h1 style="text-align:center; font-size:${fontT}; font-weight:bold; margin: ${isA6?'6px 0':'12px 0'};">${title}</h1>
+      <div style="border:1px solid #334155; padding:${isA6?'4px 6px':'6px 8px'}; margin-bottom:10px; background:#fcfcfc;">
+        <div style="display:flex; margin-bottom:2px;"><span style="font-weight:bold; width:${isA6?'60px':'100px'}; flex-shrink:0;">Khách hàng:</span> <strong style="color:#1e3a8a;">${cName}</strong></div>
+        ${taxLines.length > 0 && !isA6 ? `<div style="margin-bottom:2px;">${taxLines.join(' &nbsp;|&nbsp; ')}</div>` : ''}
+        ${!isA6 ? `<div style="display:flex; margin-bottom:2px;"><span style="font-weight:bold; width:100px; flex-shrink:0;">Địa chỉ:</span> <span>${getVal('custAddress','')}</span></div>` : ''}
+        <div style="display:flex; margin-bottom:2px;"><span style="font-weight:bold; width:${isA6?'60px':'100px'}; flex-shrink:0;">Liên hệ:</span> <span><strong style="color:#1e3a8a;">${getVal('contactPerson','')}</strong> &nbsp;|&nbsp; <strong>SĐT:</strong> <strong>${getVal('custPhone','')}</strong></span></div>
+        <div style="display:flex; margin-bottom:2px;"><span style="font-weight:bold; width:${isA6?'60px':'100px'}; flex-shrink:0;">Giao hàng:</span> <span>${getVal('deliveryAddress','')}</span></div>
+        ${isA6 && getVal('deliveryTime','') ? `<div style="display:flex; margin-bottom:2px;"><span style="font-weight:bold; width:60px; flex-shrink:0;">Thời gian:</span> <span>${getVal('deliveryTime','')}</span></div>` : ''}
+      </div>
+      <table style="width:100%; border-collapse:collapse; margin-bottom:10px;">
+        <thead style="background:#e2e8f0;">
+          ${hidePrice ? `<tr><th style="border:1px solid #000;padding:${cellP};width:6%">STT</th><th style="border:1px solid #000;padding:${cellP};width:${isA6?'60%':'54%'}">TÊN HÀNG & QUY CÁCH</th><th style="border:1px solid #000;padding:${cellP};width:10%">ĐVT</th><th style="border:1px solid #000;padding:${cellP};width:12\%">SL</th>${isA6 ? '' : `<th style="border:1px solid #000;padding:${cellP};width:18%">KIỂM ĐẾM</th>`}</tr>` : `<tr><th style="border:1px solid #000;padding:${cellP};width:5%">STT</th><th style="border:1px solid #000;padding:${cellP};width:43%">TÊN HÀNG & QUY CÁCH</th><th style="border:1px solid #000;padding:${cellP};width:8%">ĐVT</th><th style="border:1px solid #000;padding:${cellP};width:11%">SL</th><th style="border:1px solid #000;padding:${cellP};width:16%">ĐƠN GIÁ</th><th style="border:1px solid #000;padding:${cellP};width:17%">THÀNH TIỀN</th></tr>`}
+        </thead>
+        <tbody>${tbodyStr}</tbody>
+      </table>
+      ${(!hidePrice && !isNoSum && !isA6) ? `<div style="margin-bottom:15px;">• Số tiền bằng chữ: <strong>${totalWords}</strong></div>` : ''}
+      ${isNoSum && !isA6 ? `<div style="font-style:italic; margin-bottom:10px;">* Lưu ý: Bảng báo giá trên gồm các phương án lựa chọn độc lập.</div>` : ''}
+      ${!isA6 ? termsHtml : ''}
+      ${!isA6 ? `<table style="width:100%; text-align:center; margin-top:20px;"><tr>${window.activeDocMode === 'delivery' ? `<td style="width:33%;"><strong>NGƯỜI LẬP PHIẾU</strong><br><br><br><br><br><strong>${creatorName}</strong></td><td style="width:33%;"><strong>NGƯỜI GIAO HÀNG</strong><br><br><br><br><br></td><td style="width:34%;"><strong>NGƯỜI NHẬN HÀNG</strong><br><br><br><br><br></td>` : `<td style="width:50%;"><strong>XÁC NHẬN KHÁCH HÀNG</strong><br><br><br><br><br></td><td style="width:50%;"><strong>ĐẠI DIỆN</strong><br><strong>${sName.toUpperCase()}</strong><br><br><br><br><strong>${creatorName}</strong></td>`}</tr></table>` : `<div style="text-align:right; font-weight:bold; margin-top:10px;">Lập phiếu: ${creatorName}</div>`}
+    </div>`;
 };
 
-// Đã fix: Ép ghi đè toàn bộ dữ liệu khi Chọn Khách hàng từ DB
-window.selectCustomerById = function(custId) {
-  let custData = JSON.parse(window.SafeStore.get('docugen_customers') || '{}');
-  let c = custData[custId];
-  if(!c) return;
-  
-  if(document.getElementById('currentCustomerId')) document.getElementById('currentCustomerId').value = custId;
-  if(document.getElementById('custName')) document.getElementById('custName').value = c.name || '';
-  if(document.getElementById('custPhone')) document.getElementById('custPhone').value = c.phone || '';
-  if(document.getElementById('custAddress')) document.getElementById('custAddress').value = c.address || '';
-  if(document.getElementById('custTaxId')) document.getElementById('custTaxId').value = c.taxId || '';
-  if(document.getElementById('custCompanyPhone')) document.getElementById('custCompanyPhone').value = c.companyPhone || '';
-  if(document.getElementById('custEmail')) document.getElementById('custEmail').value = c.email || '';
-  if(document.getElementById('contactPerson')) document.getElementById('contactPerson').value = c.contactPerson || '';
-  if(document.getElementById('deliveryAddress')) document.getElementById('deliveryAddress').value = c.deliveryAddress || '';
-  if(document.getElementById('deliveryTime')) document.getElementById('deliveryTime').value = c.deliveryTime || '';
-  if(document.getElementById('sameAddressCheckbox')) document.getElementById('sameAddressCheckbox').checked = !!c.sameAddress;
-  
-  if(window.closeCustomerModal) window.closeCustomerModal();
-  if(window.showToast) window.showToast(`Đã chọn Khách hàng: ${c.name}`, "success");
+window.exportToPdf = async function() {
+  const pSize = window.activeDocMode === 'delivery' ? window.deliveryPaperSize : (window.activeDocMode === 'order' && window.deliveryPaperSize ? window.deliveryPaperSize : 'A4');
+  let format = 'a4'; let orientation = 'portrait';
+  if(pSize === 'A6-portrait') format = 'a6'; else if(pSize === 'A5-landscape') { format = 'a5'; orientation = 'landscape'; } else if(pSize === 'A5-portrait') format = 'a5';
+  const opt = { margin:0, filename:`${document.getElementById('docNumberInput').value.replace('Sẽ cấp tự động khi Lưu', 'Phieu_Moi')}.pdf`, image:{type:'jpeg',quality:0.98}, html2canvas:{scale:2}, jsPDF:{unit:'mm', format: format, orientation: orientation} };
+  const btn = document.getElementById('headerExportPdfBtn'); btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang tải...';
+  await html2pdf().set(opt).from(document.getElementById('printDocument')).save();
+  btn.innerHTML = '<i class="fa-solid fa-file-pdf"></i> Tải PDF';
 };
+
+window.switchViewTab = (t) => { const f = document.getElementById('section-form'); const p = document.getElementById('section-preview'); if(f) f.classList.toggle('hidden', t!=='form'); if(p) p.classList.toggle('hidden', t==='form'); };
+window.fitZoomScreen = () => { const z = document.getElementById('zoomWrapper'); if(z) z.style.transform = `scale(${window.innerWidth < 768 ? 0.6 : (window.innerWidth < 1280 ? 0.8 : 0.92)})`; };
