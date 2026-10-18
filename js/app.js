@@ -31,6 +31,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       });
   }
 
+  const btnQuote = document.getElementById('tabModeQuote');
+  const btnOrder = document.getElementById('tabModeOrder');
+  const btnDelivery = document.getElementById('tabModeDelivery');
+  if(btnQuote) btnQuote.addEventListener('click', () => window.switchDocMode('quote'));
+  if(btnOrder) btnOrder.addEventListener('click', () => window.switchDocMode('order'));
+  if(btnDelivery) btnDelivery.addEventListener('click', () => window.switchDocMode('delivery'));
+
   if (window.initAppAuth) {
     await window.initAppAuth();
   } else {
@@ -56,7 +63,7 @@ window.processAI = () => {
   }, 1500);
 };
 
-// ĐÃ GỘP: Hàm chọn khách hàng có xóa rác dữ liệu
+// Hàm chọn khách hàng (Đã fix xóa rác dữ liệu cũ)
 window.selectCustomerById = function(id) {
   if (window.activeDocMode !== 'quote') { window.showToast("Chỉ có thể chọn khách hàng ở Tab Báo Giá", "error"); return; }
   let custData = JSON.parse(window.SafeStore.get('docugen_customers') || '{}'); const c = custData[id]; if(!c) return;
@@ -82,7 +89,7 @@ window.selectCustomerById = function(id) {
   window.showToast("Đã nạp thông tin KH", "success");
 };
 
-// ĐÃ GỘP: Hàm nạp đơn hàng có xóa rác và đẩy đủ dữ liệu các tab
+// Hàm nạp đơn hàng (Đã fix xóa rác và chép đủ cấu hình)
 window.loadOrder = (id) => {
   let orders = JSON.parse(window.SafeStore.get('docugen_orders') || '{}'); let o = orders[id]; if(!o) return;
   
@@ -144,13 +151,18 @@ window.initDefaultDocMeta = function() {
   }
 };
 
+// Hàm chuyển tab (Đã vá lỗi kẹt Đặt hàng sau khi lưu Báo giá)
 window.switchDocMode = (m, preventReset = false) => { 
+  if (window.currentOrderId && !window.orderDates) {
+      window.orderDates = { quote: window.currentOrderDate, order: null, delivery: null };
+  }
+
   if (!preventReset && m !== window.activeDocMode) {
-      if (m === 'order' && (!window.currentOrderId || !window.orderDates || !window.orderDates['quote'])) {
+      if (m === 'order' && !window.currentOrderId) {
           window.showToast("Bắt buộc phải LƯU BÁO GIÁ trước khi lên Đơn Đặt Hàng!", "error");
           return; 
       }
-      if (m === 'delivery' && (!window.currentOrderId || !window.orderDates || !window.orderDates['order'])) {
+      if (m === 'delivery' && !window.currentOrderId) {
           window.showToast("Bắt buộc phải LƯU ĐƠN ĐẶT HÀNG trước khi xuất Giao Hàng!", "error");
           return; 
       }
@@ -233,7 +245,7 @@ window.updateModeUI = function() {
 window.toggleSameDeliveryAddress = () => { if(window.activeDocMode !== 'quote') return; const chk = document.getElementById('sameAddressCheckbox'); const d = document.getElementById('deliveryAddress'); const cAdd = document.getElementById('custAddress'); if(!chk || !d || !cAdd) return; if(chk.checked) { d.value = cAdd.value; d.readOnly = true; d.classList.add('bg-slate-100'); } else { d.readOnly = false; d.classList.remove('bg-slate-100'); } window.renderDocPreview(); };
 window.handleCompanyAddressInput = () => { const chk = document.getElementById('sameAddressCheckbox'); const d = document.getElementById('deliveryAddress'); const cAdd = document.getElementById('custAddress'); if(chk && chk.checked && d && cAdd) { d.value = cAdd.value; window.renderDocPreview(); } };
 
-// ĐÃ GỘP: Reset trắng bóc tạo phiếu mới
+// Reset form tạo phiếu mới
 window.resetCustomerForm = () => {
   window.currentOrderId = null; window.orderDates = null;
   ['currentCustomerId','custName','custTaxId','custCompanyPhone','custEmail','custAddress','contactPerson','custPhone','deliveryAddress', 'deliveryTime'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
