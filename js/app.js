@@ -88,7 +88,6 @@ window.selectCustomerById = function(id) {
   window.showToast("Đã nạp thông tin KH", "success");
 };
 
-// ĐÃ SỬA: Ép xóa sạch mọi thông tin mẫu cũ khi load đơn hàng
 window.loadOrder = (id) => {
   let orders = JSON.parse(window.SafeStore.get('docugen_orders') || '{}'); let o = orders[id]; if(!o) return;
   
@@ -98,16 +97,14 @@ window.loadOrder = (id) => {
   }
   window.orderDates = o.orderDates || { quote: o.date, order: null, delivery: null };
   
-  // ÉP XÓA RÁC BỘ NHỚ TRƯỚC KHI NẠP: Chỉ lấy đúng items của đơn hàng này
-  window.tabItems = { quote: null, order: null, delivery: null }; 
-  window.tabItems[o.mode || 'quote'] = JSON.parse(JSON.stringify(o.items || [])); 
+  if (o.tabItems) window.tabItems = JSON.parse(JSON.stringify(o.tabItems));
+  else { window.tabItems = { quote: null, order: null, delivery: null }; window.tabItems[o.mode || 'quote'] = JSON.parse(JSON.stringify(o.items || [])); }
 
-  window.tabNotes = { 
-    quote: "- Báo giá có giá trị trong vòng 15 ngày.\n- Giá trên chưa bao gồm 8% thuế GTGT.\n- Miễn phí giao hàng nội thành TP.HCM.", 
-    order: "- Khách hàng kiểm tra và ký xác nhận duyệt nội dung, màu sắc trước khi sản xuất hàng loạt.\n- Hàng giao tận nơi theo thỏa thuận.", 
-    delivery: "- Quý khách vui lòng kiểm tra kỹ số lượng và chất lượng trước khi nhận hàng.\n- Hàng giao tận nơi theo thỏa thuận." 
-  };
-  window.tabNotes[o.mode || 'quote'] = o.terms || '';
+  if (o.tabNotes) window.tabNotes = JSON.parse(JSON.stringify(o.tabNotes));
+  else {
+      window.tabNotes = { quote: "- Báo giá có giá trị trong vòng 15 ngày.\n- Giá trên chưa bao gồm 8% thuế GTGT.\n- Miễn phí giao hàng nội thành TP.HCM.", order: "- Khách hàng kiểm tra và ký xác nhận duyệt nội dung, màu sắc trước khi sản xuất hàng loạt.\n- Hàng giao tận nơi theo thỏa thuận.", delivery: "- Quý khách vui lòng kiểm tra kỹ số lượng và chất lượng trước khi nhận hàng.\n- Hàng giao tận nơi theo thỏa thuận." };
+      window.tabNotes[o.mode || 'quote'] = o.terms || '';
+  }
 
   const setVal = (elmId, val) => { const el = document.getElementById(elmId); if(el) el.value = val || ''; };
   setVal('custName', o.customerName);
@@ -152,7 +149,6 @@ window.initDefaultDocMeta = function() {
   }
 };
 
-// ĐÃ SỬA: Cho phép kế thừa ngược, đổi đúng màu tab ở trên cùng
 window.switchDocMode = (m, preventReset = false) => { 
   if (!preventReset && window.tabItems && window.itemsList) {
       window.tabItems[window.activeDocMode] = JSON.parse(JSON.stringify(window.itemsList));
@@ -177,7 +173,6 @@ window.switchDocMode = (m, preventReset = false) => {
 
   window.activeDocMode = m; 
   
-  // Đổi màu Nút Tab ở trên cùng
   const btnQuote = document.getElementById('tabModeQuote');
   const btnOrder = document.getElementById('tabModeOrder');
   const btnDelivery = document.getElementById('tabModeDelivery');
@@ -187,7 +182,6 @@ window.switchDocMode = (m, preventReset = false) => {
 
   if (!preventReset) {
       if (!window.tabItems[m]) {
-          // Kế thừa 2 chiều: Copy qua lại tự do giữa các tab để không bị mất hàng
           if (m === 'quote' && window.tabItems['order']) window.tabItems[m] = JSON.parse(JSON.stringify(window.tabItems['order']));
           else if (m === 'order' && window.tabItems['quote']) window.tabItems[m] = JSON.parse(JSON.stringify(window.tabItems['quote']));
           else if (m === 'delivery' && window.tabItems['order']) window.tabItems[m] = JSON.parse(JSON.stringify(window.tabItems['order']));
@@ -403,3 +397,91 @@ window.exportToPdf = async function() {
 
 window.switchViewTab = (t) => { const f = document.getElementById('section-form'); const p = document.getElementById('section-preview'); if(f) f.classList.toggle('hidden', t!=='form'); if(p) p.classList.toggle('hidden', t==='form'); };
 window.fitZoomScreen = () => { const z = document.getElementById('zoomWrapper'); if(z) z.style.transform = `scale(${window.innerWidth < 768 ? 0.6 : (window.innerWidth < 1280 ? 0.8 : 0.92)})`; };
+
+// ĐÃ THÊM: Ghi đè hàm lưu lên mây để lưu TRỌN BỘ 3 NGĂN KÉO dữ liệu
+window.saveOrderToCloud = async () => {
+  if (window.tabItems && window.itemsList) {
+      window.tabItems[window.activeDocMode] = JSON.parse(JSON.stringify(window.itemsList));
+      const termsEl = document.getElementById('docTerms'); 
+      if(termsEl) window.tabNotes[window.activeDocMode] = termsEl.value;
+  }
+
+  const isNew = !window.currentOrderId;
+  if (isNew) {
+    const now = new Date();
+    const pfx = window.activeDocMode === 'quote' ? 'BG' : (window.activeDocMode === 'order' ? 'ĐH' : 'GH');
+    const num = `${now.getFullYear()}${String(now.getDate()).padStart(2,'0')}${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
+    window.currentOrderId = `${pfx}-${num}`;
+    window.currentOrderDate = now.toLocaleDateString('vi-VN');
+    if(!window.orderDates) window.orderDates = { quote: window.currentOrderDate, order: null, delivery: null };
+  }
+  
+  if (window.orderDates && !window.orderDates[window.activeDocMode]) {
+      window.orderDates[window.activeDocMode] = new Date().toLocaleDateString('vi-VN');
+  }
+
+  let orderData = {
+    mode: window.activeDocMode,
+    date: window.currentOrderDate,
+    customerName: document.getElementById('custName').value,
+    taxId: document.getElementById('custTaxId').value,
+    companyPhone: document.getElementById('custCompanyPhone').value,
+    email: document.getElementById('custEmail').value,
+    address: document.getElementById('custAddress').value,
+    contactPerson: document.getElementById('contactPerson').value,
+    phone: document.getElementById('custPhone').value,
+    deliveryAddress: document.getElementById('deliveryAddress').value,
+    deliveryTime: document.getElementById('deliveryTime').value,
+    sameAddress: document.getElementById('sameAddressCheckbox').checked,
+    customerId: document.getElementById('currentCustomerId').value,
+    items: JSON.parse(JSON.stringify(window.itemsList || [])),
+    tabItems: JSON.parse(JSON.stringify(window.tabItems || {})),
+    tabNotes: JSON.parse(JSON.stringify(window.tabNotes || {})),
+    orderDates: window.orderDates,
+    total: (document.getElementById('displayGrandTotal') ? document.getElementById('displayGrandTotal').innerText.replace(' đ', '') : '0'),
+    quoteSumMode: window.quoteSumMode,
+    depositType: window.depositType,
+    depositPercent: document.getElementById('depositPercent') ? document.getElementById('depositPercent').value : 0,
+    depositAmount: document.getElementById('depositFixedAmountInput') ? document.getElementById('depositFixedAmountInput').value : 0,
+    terms: document.getElementById('docTerms') ? document.getElementById('docTerms').value : '',
+    vat: document.getElementById('vatSelect') ? document.getElementById('vatSelect').value : 0
+  };
+  
+  let orders = JSON.parse(window.SafeStore.get('docugen_orders') || '{}');
+  orders[window.currentOrderId] = orderData;
+  window.SafeStore.set('docugen_orders', JSON.stringify(orders));
+  if(window.initDefaultDocMeta) window.initDefaultDocMeta();
+  if(window.renderDocPreview) window.renderDocPreview();
+  window.showToast(`Đã lưu Phiếu: ${window.currentOrderId}`, "success");
+
+  let jsonPayload = JSON.stringify({
+    taxId: orderData.taxId,
+    companyPhone: orderData.companyPhone,
+    email: orderData.email,
+    address: orderData.address,
+    contactPerson: orderData.contactPerson,
+    phone: orderData.phone,
+    deliveryAddress: orderData.deliveryAddress,
+    deliveryTime: orderData.deliveryTime,
+    sameAddress: orderData.sameAddress,
+    customerId: orderData.customerId,
+    items: orderData.items,
+    tabItems: orderData.tabItems,
+    tabNotes: orderData.tabNotes,
+    orderDates: orderData.orderDates,
+    quoteSumMode: orderData.quoteSumMode,
+    depositType: orderData.depositType,
+    depositPercent: orderData.depositPercent,
+    depositAmount: orderData.depositAmount,
+    terms: orderData.terms,
+    vat: orderData.vat
+  });
+  await window.cloudSync('SAVE_ORDER', {
+    MaPhieu: window.currentOrderId,
+    NgayLap: window.currentOrderDate,
+    TenKH: orderData.customerName,
+    LoaiPhieu: orderData.mode,
+    TongTien: orderData.total,
+    Data_JSON: jsonPayload
+  });
+};
