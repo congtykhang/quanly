@@ -1,4 +1,4 @@
-// Đã gắn sẵn đường link Web App của anh Duy
+// ==========================================
 window.APP_CONFIG = {
   SHEET_URL: "https://script.google.com/macros/s/AKfycbze73fc35zCRE0iJnuvh6vMBT2tRzAsEvl0BvWSG9sobdip4sMR6sWUUYEpZ1ZHiM_3/exec",
   GEMINI_KEY: ""
@@ -11,12 +11,12 @@ window.SafeStore = {
   remove(k) { delete this.mem[k]; try { localStorage.removeItem(k); } catch(e) {} }
 };
 
-// Tự động lưu link cấu hình vào bộ nhớ máy
 window.SafeStore.set('docugen_cfg_sheet', window.APP_CONFIG.SHEET_URL);
 
 window.currentUserRole = 'employee';
 window.currentAppUsername = '';
 window.currentAppFullName = '';
+window.activeDocMode = 'quote'; // Mặc định chế độ báo giá
 
 window.DEFAULT_COMPANY = {
   name: "CÔNG TY TNHH PHẠM DUY KHANG",
@@ -36,7 +36,6 @@ window.showToast = function(msg, type="info") {
   setTimeout(()=>t.remove(), 3500);
 };
 
-// Hàm chuẩn hóa ngày tháng từ Google Sheets
 function formatSheetDate(val) {
   if (!val) return '';
   const str = String(val);
@@ -47,7 +46,9 @@ function formatSheetDate(val) {
   return str;
 }
 
+// ==========================================
 // KẾT NỐI CLOUD (GOOGLE SHEETS)
+// ==========================================
 window.cloudSync = async function(action, payload = null, id = null) {
   const url = window.APP_CONFIG.SHEET_URL || window.SafeStore.get('docugen_cfg_sheet');
   if (!url) return null; 
@@ -143,7 +144,9 @@ window.doFullSync = async function() {
   return true;
 };
 
+// ==========================================
 // XỬ LÝ ĐĂNG NHẬP & PHÂN QUYỀN
+// ==========================================
 window.initAppAuth = async function() {
   const loadingEl = document.getElementById('authLoadingOverlay');
   if (loadingEl) loadingEl.classList.remove('hidden');
@@ -242,7 +245,9 @@ document.getElementById('formForgotPass').addEventListener('submit', async (e) =
   document.getElementById('loginPass').value = '';
 });
 
+// ==========================================
 // QUẢN LÝ NHÂN SỰ & CÀI ĐẶT
+// ==========================================
 window.openSystemSettingsModal = () => { document.getElementById('systemSettingsModal').classList.remove('hidden'); };
 window.closeSystemSettingsModal = () => { document.getElementById('systemSettingsModal').classList.add('hidden'); };
 window.loadSystemSettings = () => {
@@ -300,7 +305,9 @@ window.deleteEmployee = async function(username) {
   window.loadEmployees();
 };
 
-// THÔNG TIN CÔNG TY
+// ==========================================
+// THÔNG TIN CÔNG TY & CHUYỂN ĐỔI CHẾ ĐỘ PHIẾU
+// ==========================================
 window.loadCompanyInfoFromCloud = function() {
   let data = JSON.parse(window.SafeStore.get('docugen_company') || 'null') || window.DEFAULT_COMPANY;
   document.getElementById('sellerName').value = data.name || '';
@@ -339,7 +346,23 @@ window.toggleCompanyEditMode = function() {
   if(!window.isCompanyEditing) window.syncCompanyReadOnlyView();
 };
 
-// QUẢN LÝ KHÁCH HÀNG DB
+window.switchDocMode = function(mode) {
+  window.activeDocMode = mode;
+  const btnQuote = document.getElementById('tabModeQuote');
+  const btnOrder = document.getElementById('tabModeOrder');
+  const btnDelivery = document.getElementById('tabModeDelivery');
+  
+  if(btnQuote) btnQuote.className = mode === 'quote' ? 'px-4 py-2 bg-blue-600 text-white font-bold rounded-lg shadow' : 'px-4 py-2 bg-slate-200 text-slate-700 rounded-lg';
+  if(btnOrder) btnOrder.className = mode === 'order' ? 'px-4 py-2 bg-indigo-600 text-white font-bold rounded-lg shadow' : 'px-4 py-2 bg-slate-200 text-slate-700 rounded-lg';
+  if(btnDelivery) btnDelivery.className = mode === 'delivery' ? 'px-4 py-2 bg-emerald-600 text-white font-bold rounded-lg shadow' : 'px-4 py-2 bg-slate-200 text-slate-700 rounded-lg';
+
+  if (window.updateModeUI) window.updateModeUI();
+  if (window.renderDocPreview) window.renderDocPreview();
+};
+
+// ==========================================
+// QUẢN LÝ KHÁCH HÀNG & ĐƠN HÀNG DB
+// ==========================================
 window.openCustomerModal = () => { document.getElementById('customerModal').classList.remove('hidden'); window.renderCustomerList(); };
 window.closeCustomerModal = () => document.getElementById('customerModal').classList.add('hidden');
 window.renderCustomerList = (search = '') => {
@@ -400,7 +423,6 @@ window.deleteCustomer = async function(id) {
   await window.cloudSync('DELETE_CUSTOMER', null, id);
 };
 
-// QUẢN LÝ ĐƠN HÀNG DB
 window.openOrderModal = () => { document.getElementById('orderModal').classList.remove('hidden'); window.renderOrderList(); };
 window.closeOrderModal = () => document.getElementById('orderModal').classList.add('hidden');
 window.renderOrderList = () => {
