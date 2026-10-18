@@ -20,10 +20,49 @@ window.tabItems = { quote: null, order: null, delivery: null };
 window.tabItems['quote'] = [ { name: "In tem nhãn Decal giấy (Bế đờ mi, cán màng bóng)", unit: "Tem", qty: 5000, price: 350 }, { name: "In hộp giấy Kraft bế dán thành phẩm", unit: "Hộp", qty: 1000, price: 4500 }, { name: "Thiết kế file in (Miễn phí theo đơn)", unit: "Gói", qty: 1, price: 0 } ];
 window.itemsList = JSON.parse(JSON.stringify(window.tabItems['quote']));
 
-// KHỞI ĐỘNG HỆ THỐNG
+// KHỞI ĐỘNG HỆ THỐNG & TIÊM CSS TỐI ƯU MOBILE
 document.addEventListener("DOMContentLoaded", async () => {
   console.log("DocuGen Pro đang khởi động...");
   
+  // Tự động tiêm CSS tối ưu Giao diện Mobile (Không ảnh hưởng máy tính)
+  const mStyle = document.createElement('style');
+  mStyle.innerHTML = `
+    @media (max-width: 768px) {
+      /* Phóng to ô nhập liệu chống tự zoom trên iOS, nới rộng khoảng cách */
+      #section-form input[type="text"], #section-form input[type="number"], #section-form input[type="email"], #section-form select, #section-form textarea {
+        font-size: 16px !important;
+        padding: 12px 10px !important;
+        border-radius: 8px !important;
+        margin-bottom: 4px !important;
+      }
+      /* Tăng vùng chạm của nút bấm */
+      #section-form button {
+        min-height: 44px !important;
+      }
+      /* Chống bóp méo bảng hàng hóa, tự động lướt ngang mượt mà */
+      .overflow-x-auto {
+        -webkit-overflow-scrolling: touch;
+      }
+      #itemsTableBody td {
+        padding: 6px 4px !important;
+      }
+      #itemsTableBody input {
+        min-width: 70px !important; 
+        padding: 10px 8px !important; 
+        font-size: 16px !important;
+        background-color: #f8fafc !important; /* Đổ nền nhẹ để dễ nhìn ô nhập */
+      }
+      #itemsTableBody input[type="text"] {
+        min-width: 140px !important;
+      }
+      /* Dãn cách form khách hàng */
+      #section-form .grid {
+        gap: 16px !important;
+      }
+    }
+  `;
+  document.head.appendChild(mStyle);
+
   const searchCustomerInput = document.getElementById('searchCustomerInput');
   if (searchCustomerInput) {
       searchCustomerInput.addEventListener('input', (e) => {
@@ -97,14 +136,15 @@ window.loadOrder = (id) => {
   }
   window.orderDates = o.orderDates || { quote: o.date, order: null, delivery: null };
   
-  if (o.tabItems) window.tabItems = JSON.parse(JSON.stringify(o.tabItems));
-  else { window.tabItems = { quote: null, order: null, delivery: null }; window.tabItems[o.mode || 'quote'] = JSON.parse(JSON.stringify(o.items || [])); }
+  window.tabItems = { quote: null, order: null, delivery: null }; 
+  window.tabItems[o.mode || 'quote'] = JSON.parse(JSON.stringify(o.items || [])); 
 
-  if (o.tabNotes) window.tabNotes = JSON.parse(JSON.stringify(o.tabNotes));
-  else {
-      window.tabNotes = { quote: "- Báo giá có giá trị trong vòng 15 ngày.\n- Giá trên chưa bao gồm 8% thuế GTGT.\n- Miễn phí giao hàng nội thành TP.HCM.", order: "- Khách hàng kiểm tra và ký xác nhận duyệt nội dung, màu sắc trước khi sản xuất hàng loạt.\n- Hàng giao tận nơi theo thỏa thuận.", delivery: "- Quý khách vui lòng kiểm tra kỹ số lượng và chất lượng trước khi nhận hàng.\n- Hàng giao tận nơi theo thỏa thuận." };
-      window.tabNotes[o.mode || 'quote'] = o.terms || '';
-  }
+  window.tabNotes = { 
+    quote: "- Báo giá có giá trị trong vòng 15 ngày.\n- Giá trên chưa bao gồm 8% thuế GTGT.\n- Miễn phí giao hàng nội thành TP.HCM.", 
+    order: "- Khách hàng kiểm tra và ký xác nhận duyệt nội dung, màu sắc trước khi sản xuất hàng loạt.\n- Hàng giao tận nơi theo thỏa thuận.", 
+    delivery: "- Quý khách vui lòng kiểm tra kỹ số lượng và chất lượng trước khi nhận hàng.\n- Hàng giao tận nơi theo thỏa thuận." 
+  };
+  window.tabNotes[o.mode || 'quote'] = o.terms || '';
 
   const setVal = (elmId, val) => { const el = document.getElementById(elmId); if(el) el.value = val || ''; };
   setVal('custName', o.customerName);
@@ -274,7 +314,7 @@ window.resetCustomerForm = () => {
 window.renderItemsTable = function() {
   const tbody = document.getElementById('itemsTableBody'); if(!tbody) return; tbody.innerHTML = ''; const isPriceReadOnly = window.activeDocMode !== 'quote';
   window.itemsList.forEach((it, i) => {
-    const priceInputHtml = isPriceReadOnly ? `<div class="relative w-full"><i class="fa-solid fa-lock absolute left-2 top-2 text-slate-400 text-[9px]"></i><input type="number" value="${it.price}" readonly class="w-full text-right pl-5 bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200 rounded p-1 text-xs font-mono"></div>` : `<input type="number" value="${it.price}" oninput="window.updateItem(${i}, 'price', this)" class="w-full text-right bg-transparent text-blue-700 border border-slate-300 rounded p-1 text-xs font-mono font-bold outline-none focus:ring-1 focus:ring-blue-500">`;
+    const priceInputHtml = isPriceReadOnly ? `<div class="relative w-full"><i class="fa-solid fa-lock absolute left-2 top-2 text-slate-400 text-[9px]"></i><input type="number" value="${it.price}" readonly class="w-full text-right pl-5 text-slate-400 cursor-not-allowed border border-slate-200 rounded p-1 text-xs font-mono"></div>` : `<input type="number" value="${it.price}" oninput="window.updateItem(${i}, 'price', this)" class="w-full text-right bg-transparent text-blue-700 border border-slate-300 rounded p-1 text-xs font-mono font-bold outline-none focus:ring-1 focus:ring-blue-500">`;
     tbody.innerHTML += `<tr class="hover:bg-slate-50 border-b border-slate-100 transition-colors"><td class="p-2 text-center font-bold text-slate-400">${i+1}</td><td class="p-2"><input type="text" value="${it.name}" oninput="window.updateItem(${i}, 'name', this)" class="w-full bg-transparent border border-slate-300 rounded p-1 text-xs outline-none focus:ring-1 focus:ring-blue-500"></td><td class="p-2"><input type="text" value="${it.unit}" oninput="window.updateItem(${i}, 'unit', this)" class="w-full text-center bg-transparent border border-slate-300 rounded p-1 text-xs outline-none focus:ring-1 focus:ring-blue-500"></td><td class="p-2"><input type="number" value="${it.qty}" oninput="window.updateItem(${i}, 'qty', this)" class="w-full text-right bg-transparent border border-slate-300 rounded p-1 text-xs outline-none focus:ring-1 focus:ring-blue-500"></td><td class="p-2">${priceInputHtml}</td><td class="p-2 text-right font-mono font-bold text-slate-700" id="rowTotal_${i}">${Math.round(it.qty*it.price).toLocaleString('vi-VN')}</td><td class="p-2 text-center"><button onclick="window.removeItemRow(${i})" class="text-rose-400 hover:text-rose-600 transition"><i class="fa-solid fa-xmark"></i></button></td></tr>`;
   });
   window.renderDocPreview();
@@ -398,7 +438,6 @@ window.exportToPdf = async function() {
 window.switchViewTab = (t) => { const f = document.getElementById('section-form'); const p = document.getElementById('section-preview'); if(f) f.classList.toggle('hidden', t!=='form'); if(p) p.classList.toggle('hidden', t==='form'); };
 window.fitZoomScreen = () => { const z = document.getElementById('zoomWrapper'); if(z) z.style.transform = `scale(${window.innerWidth < 768 ? 0.6 : (window.innerWidth < 1280 ? 0.8 : 0.92)})`; };
 
-// ĐÃ THÊM: Ghi đè hàm lưu lên mây để lưu TRỌN BỘ 3 NGĂN KÉO dữ liệu
 window.saveOrderToCloud = async () => {
   if (window.tabItems && window.itemsList) {
       window.tabItems[window.activeDocMode] = JSON.parse(JSON.stringify(window.itemsList));
