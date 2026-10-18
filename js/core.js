@@ -116,7 +116,9 @@ window.doFullSync = async function() {
         phone: String(c.SDT ?? '')
       };
     }
-    window.SafeStore.set('docugen_customers', JSON.stringify(localCust));
+    if (Object.keys(localCust).length > 0) {
+      window.SafeStore.set('docugen_customers', JSON.stringify(localCust));
+    }
   }
 
   if (data.orders) {
@@ -134,7 +136,9 @@ window.doFullSync = async function() {
         total: formattedTotal
       };
     }
-    window.SafeStore.set('docugen_orders', JSON.stringify(localOrders));
+    if (Object.keys(localOrders).length > 0) {
+      window.SafeStore.set('docugen_orders', JSON.stringify(localOrders));
+    }
   }
   return true;
 };
@@ -435,18 +439,59 @@ window.saveOrderToCloud = async () => {
     deliveryTime: document.getElementById('deliveryTime').value,
     sameAddress: document.getElementById('sameAddressCheckbox').checked,
     customerId: document.getElementById('currentCustomerId').value,
-    items: JSON.parse(JSON.stringify(window.itemsList)),
-    total: document.getElementById('displayGrandTotal').innerText.replace(' đ', ''),
+    items: JSON.parse(JSON.stringify(window.itemsList || [])),
+    total: (document.getElementById('displayGrandTotal') ? document.getElementById('displayGrandTotal').innerText.replace(' đ', '') : '0'),
     quoteSumMode: window.quoteSumMode,
     depositType: window.depositType,
-    depositPercent: document.getElementById('depositPercent').value,
-    depositAmount: document.getElementById('depositFixedAmountInput').value,
-    terms: document.getElementById('docTerms').value,
-    vat: document.getElementById('vatSelect').value
+    depositPercent: document.getElementById('depositPercent') ? document.getElementById('depositPercent').value : 0,
+    depositAmount: document.getElementById('depositFixedAmountInput') ? document.getElementById('depositFixedAmountInput').value : 0,
+    terms: document.getElementById('docTerms') ? document.getElementById('docTerms').value : '',
+    vat: document.getElementById('vatSelect') ? document.getElementById('vatSelect').value : 0
   };
   
   let orders = JSON.parse(window.SafeStore.get('docugen_orders') || '{}');
   orders[window.currentOrderId] = orderData;
   window.SafeStore.set('docugen_orders', JSON.stringify(orders));
-  window.initDefaultDocMeta();
-  window.renderDocPreview();
+  if(window.initDefaultDocMeta) window.initDefaultDocMeta();
+  if(window.renderDocPreview) window.renderDocPreview();
+  window.showToast(`Đã lưu Phiếu: ${window.currentOrderId}`, "success");
+
+  let jsonPayload = JSON.stringify({
+    taxId: orderData.taxId,
+    companyPhone: orderData.companyPhone,
+    email: orderData.email,
+    address: orderData.address,
+    contactPerson: orderData.contactPerson,
+    phone: orderData.phone,
+    deliveryAddress: orderData.deliveryAddress,
+    deliveryTime: orderData.deliveryTime,
+    sameAddress: orderData.sameAddress,
+    customerId: orderData.customerId,
+    items: orderData.items,
+    quoteSumMode: orderData.quoteSumMode,
+    depositType: orderData.depositType,
+    depositPercent: orderData.depositPercent,
+    depositAmount: orderData.depositAmount,
+    terms: orderData.terms,
+    vat: orderData.vat
+  });
+  await window.cloudSync('SAVE_ORDER', {
+    MaPhieu: window.currentOrderId,
+    NgayLap: window.currentOrderDate,
+    TenKH: orderData.customerName,
+    LoaiPhieu: orderData.mode,
+    TongTien: orderData.total,
+    Data_JSON: jsonPayload
+  });
+};
+
+window.deleteOrder = async (id) => {
+  if(!confirm("Bạn có chắc muốn xóa phiếu này?")) return;
+  let orders = JSON.parse(window.SafeStore.get('docugen_orders') || '{}');
+  delete orders[id];
+  window.SafeStore.set('docugen_orders', JSON.stringify(orders));
+  window.renderOrderList();
+  window.showToast("Đã xóa Phiếu", "info");
+  if(window.currentOrderId === id && window.resetCustomerForm) window.resetCustomerForm();
+  await window.cloudSync('DELETE_ORDER', null, id);
+};
