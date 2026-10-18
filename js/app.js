@@ -30,7 +30,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Trường hợp phòng hờ core.js chưa load kịp
     const loadingEl = document.getElementById('authLoadingOverlay');
     if(loadingEl) loadingEl.classList.add('hidden');
-    document.getElementById('loginBox').classList.remove('hidden');
+    const loginBox = document.getElementById('loginBox');
+    if(loginBox) loginBox.classList.remove('hidden');
   }
 });
 
@@ -65,7 +66,6 @@ window.updateModeUI = function() {
 };
 
 window.renderDocPreview = function() {
-  // Cập nhật hiển thị giao diện xem trước chứng từ
   const totalEl = document.getElementById('displayGrandTotal');
   if(totalEl && window.itemsList) {
     let sum = window.itemsList.reduce((acc, item) => acc + (Number(item.total) || 0), 0);
@@ -73,15 +73,34 @@ window.renderDocPreview = function() {
   }
 };
 
+// Đã fix: Xóa sạch BÀN LÀM VIỆC khi tạo phiếu mới
 window.resetCustomerForm = function() {
   window.currentOrderId = null;
   window.itemsList = [];
-  const custName = document.getElementById('custName');
-  if(custName) custName.value = '';
+  
+  const textFields = ['currentCustomerId', 'custName', 'custPhone', 'custAddress', 'custTaxId', 'custCompanyPhone', 'custEmail', 'contactPerson', 'deliveryAddress', 'deliveryTime'];
+  textFields.forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.value = '';
+  });
+
+  const sameAddr = document.getElementById('sameAddressCheckbox');
+  if(sameAddr) sameAddr.checked = false;
+
+  const vat = document.getElementById('vatSelect');
+  if(vat) vat.value = '0';
+  
+  const depPct = document.getElementById('depositPercent');
+  if(depPct) depPct.value = '0';
+  
+  const depAmt = document.getElementById('depositFixedAmountInput');
+  if(depAmt) depAmt.value = '0';
+
   window.initDefaultDocMeta();
   window.renderDocPreview();
 };
 
+// Đã fix: Ép ghi đè toàn bộ dữ liệu khi xem lại Đơn hàng cũ
 window.loadOrder = function(orderId) {
   let orders = JSON.parse(window.SafeStore.get('docugen_orders') || '{}');
   let o = orders[orderId];
@@ -91,16 +110,34 @@ window.loadOrder = function(orderId) {
   window.activeDocMode = o.mode || 'quote';
   window.switchDocMode(window.activeDocMode);
   
+  if(document.getElementById('currentCustomerId')) document.getElementById('currentCustomerId').value = o.customerId || '';
   if(document.getElementById('custName')) document.getElementById('custName').value = o.customerName || '';
   if(document.getElementById('custPhone')) document.getElementById('custPhone').value = o.phone || '';
   if(document.getElementById('custAddress')) document.getElementById('custAddress').value = o.address || '';
+  if(document.getElementById('custTaxId')) document.getElementById('custTaxId').value = o.taxId || '';
+  if(document.getElementById('custCompanyPhone')) document.getElementById('custCompanyPhone').value = o.companyPhone || '';
+  if(document.getElementById('custEmail')) document.getElementById('custEmail').value = o.email || '';
+  if(document.getElementById('contactPerson')) document.getElementById('contactPerson').value = o.contactPerson || '';
+  if(document.getElementById('deliveryAddress')) document.getElementById('deliveryAddress').value = o.deliveryAddress || '';
+  if(document.getElementById('deliveryTime')) document.getElementById('deliveryTime').value = o.deliveryTime || '';
+  if(document.getElementById('sameAddressCheckbox')) document.getElementById('sameAddressCheckbox').checked = !!o.sameAddress;
+  
+  if(document.getElementById('vatSelect')) document.getElementById('vatSelect').value = o.vat || 0;
+  if(document.getElementById('docTerms')) document.getElementById('docTerms').value = o.terms || '';
+  if(document.getElementById('depositPercent')) document.getElementById('depositPercent').value = o.depositPercent || 0;
+  if(document.getElementById('depositFixedAmountInput')) document.getElementById('depositFixedAmountInput').value = o.depositAmount || 0;
+  
+  window.quoteSumMode = o.quoteSumMode || 'sum';
+  window.depositType = o.depositType || 'percent';
   
   window.itemsList = o.items || [];
   window.renderDocPreview();
+  
   if(window.closeOrderModal) window.closeOrderModal();
-  window.showToast(`Đã tải Phiếu: ${orderId}`, "success");
+  if(window.showToast) window.showToast(`Đã tải Phiếu: ${orderId}`, "success");
 };
 
+// Đã fix: Ép ghi đè toàn bộ dữ liệu khi Chọn Khách hàng từ DB
 window.selectCustomerById = function(custId) {
   let custData = JSON.parse(window.SafeStore.get('docugen_customers') || '{}');
   let c = custData[custId];
@@ -110,7 +147,14 @@ window.selectCustomerById = function(custId) {
   if(document.getElementById('custName')) document.getElementById('custName').value = c.name || '';
   if(document.getElementById('custPhone')) document.getElementById('custPhone').value = c.phone || '';
   if(document.getElementById('custAddress')) document.getElementById('custAddress').value = c.address || '';
+  if(document.getElementById('custTaxId')) document.getElementById('custTaxId').value = c.taxId || '';
+  if(document.getElementById('custCompanyPhone')) document.getElementById('custCompanyPhone').value = c.companyPhone || '';
+  if(document.getElementById('custEmail')) document.getElementById('custEmail').value = c.email || '';
+  if(document.getElementById('contactPerson')) document.getElementById('contactPerson').value = c.contactPerson || '';
+  if(document.getElementById('deliveryAddress')) document.getElementById('deliveryAddress').value = c.deliveryAddress || '';
+  if(document.getElementById('deliveryTime')) document.getElementById('deliveryTime').value = c.deliveryTime || '';
+  if(document.getElementById('sameAddressCheckbox')) document.getElementById('sameAddressCheckbox').checked = !!c.sameAddress;
   
   if(window.closeCustomerModal) window.closeCustomerModal();
-  window.showToast(`Đã chọn Khách hàng: ${c.name}`, "success");
+  if(window.showToast) window.showToast(`Đã chọn Khách hàng: ${c.name}`, "success");
 };
