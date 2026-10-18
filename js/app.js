@@ -88,6 +88,7 @@ window.selectCustomerById = function(id) {
   window.showToast("Đã nạp thông tin KH", "success");
 };
 
+// ĐÃ SỬA: Ép xóa sạch mọi thông tin mẫu cũ khi load đơn hàng
 window.loadOrder = (id) => {
   let orders = JSON.parse(window.SafeStore.get('docugen_orders') || '{}'); let o = orders[id]; if(!o) return;
   
@@ -97,14 +98,16 @@ window.loadOrder = (id) => {
   }
   window.orderDates = o.orderDates || { quote: o.date, order: null, delivery: null };
   
-  if (o.tabItems) window.tabItems = JSON.parse(JSON.stringify(o.tabItems));
-  else { window.tabItems = { quote: null, order: null, delivery: null }; window.tabItems[o.mode || 'quote'] = JSON.parse(JSON.stringify(o.items || [])); }
+  // ÉP XÓA RÁC BỘ NHỚ TRƯỚC KHI NẠP: Chỉ lấy đúng items của đơn hàng này
+  window.tabItems = { quote: null, order: null, delivery: null }; 
+  window.tabItems[o.mode || 'quote'] = JSON.parse(JSON.stringify(o.items || [])); 
 
-  if (o.tabNotes) window.tabNotes = JSON.parse(JSON.stringify(o.tabNotes));
-  else {
-      window.tabNotes = { quote: "- Báo giá có giá trị trong vòng 15 ngày.\n- Giá trên chưa bao gồm 8% thuế GTGT.\n- Miễn phí giao hàng nội thành TP.HCM.", order: "- Khách hàng kiểm tra và ký xác nhận duyệt nội dung, màu sắc trước khi sản xuất hàng loạt.\n- Hàng giao tận nơi theo thỏa thuận.", delivery: "- Quý khách vui lòng kiểm tra kỹ số lượng và chất lượng trước khi nhận hàng.\n- Hàng giao tận nơi theo thỏa thuận." };
-      window.tabNotes[o.mode || 'quote'] = o.terms || '';
-  }
+  window.tabNotes = { 
+    quote: "- Báo giá có giá trị trong vòng 15 ngày.\n- Giá trên chưa bao gồm 8% thuế GTGT.\n- Miễn phí giao hàng nội thành TP.HCM.", 
+    order: "- Khách hàng kiểm tra và ký xác nhận duyệt nội dung, màu sắc trước khi sản xuất hàng loạt.\n- Hàng giao tận nơi theo thỏa thuận.", 
+    delivery: "- Quý khách vui lòng kiểm tra kỹ số lượng và chất lượng trước khi nhận hàng.\n- Hàng giao tận nơi theo thỏa thuận." 
+  };
+  window.tabNotes[o.mode || 'quote'] = o.terms || '';
 
   const setVal = (elmId, val) => { const el = document.getElementById(elmId); if(el) el.value = val || ''; };
   setVal('custName', o.customerName);
@@ -149,16 +152,14 @@ window.initDefaultDocMeta = function() {
   }
 };
 
-// ĐÃ SỬA: Chặn ghi đè dữ liệu cũ khi load đơn mới & Vá lỗi khóa tab Đặt hàng
+// ĐÃ SỬA: Cho phép kế thừa ngược, đổi đúng màu tab ở trên cùng
 window.switchDocMode = (m, preventReset = false) => { 
-  // CHỈ lưu màn hình hiện tại vào bộ nhớ nếu KHÔNG PHẢI đang nạp dữ liệu từ Cloud
   if (!preventReset && window.tabItems && window.itemsList) {
       window.tabItems[window.activeDocMode] = JSON.parse(JSON.stringify(window.itemsList));
       const termsEl = document.getElementById('docTerms'); 
       if(termsEl) window.tabNotes[window.activeDocMode] = termsEl.value;
   }
 
-  // Vá lỗi khóa tab Đặt hàng: Tự động cấp bộ đếm ngày tháng nếu đã có mã phiếu
   if (window.currentOrderId && !window.orderDates) {
       window.orderDates = { quote: window.currentOrderDate, order: null, delivery: null };
   }
@@ -175,13 +176,23 @@ window.switchDocMode = (m, preventReset = false) => {
   }
 
   window.activeDocMode = m; 
+  
+  // Đổi màu Nút Tab ở trên cùng
+  const btnQuote = document.getElementById('tabModeQuote');
+  const btnOrder = document.getElementById('tabModeOrder');
+  const btnDelivery = document.getElementById('tabModeDelivery');
+  if(btnQuote) btnQuote.className = m === 'quote' ? 'px-4 py-2 bg-blue-600 text-white font-bold rounded-lg shadow transition' : 'px-4 py-2 bg-slate-200 text-slate-700 hover:bg-slate-300 transition rounded-lg';
+  if(btnOrder) btnOrder.className = m === 'order' ? 'px-4 py-2 bg-indigo-600 text-white font-bold rounded-lg shadow transition' : 'px-4 py-2 bg-slate-200 text-slate-700 hover:bg-slate-300 transition rounded-lg';
+  if(btnDelivery) btnDelivery.className = m === 'delivery' ? 'px-4 py-2 bg-emerald-600 text-white font-bold rounded-lg shadow transition' : 'px-4 py-2 bg-slate-200 text-slate-700 hover:bg-slate-300 transition rounded-lg';
 
   if (!preventReset) {
       if (!window.tabItems[m]) {
-          if (m === 'order' && window.tabItems['quote']) window.tabItems[m] = JSON.parse(JSON.stringify(window.tabItems['quote']));
+          // Kế thừa 2 chiều: Copy qua lại tự do giữa các tab để không bị mất hàng
+          if (m === 'quote' && window.tabItems['order']) window.tabItems[m] = JSON.parse(JSON.stringify(window.tabItems['order']));
+          else if (m === 'order' && window.tabItems['quote']) window.tabItems[m] = JSON.parse(JSON.stringify(window.tabItems['quote']));
           else if (m === 'delivery' && window.tabItems['order']) window.tabItems[m] = JSON.parse(JSON.stringify(window.tabItems['order']));
           else if (m === 'delivery' && window.tabItems['quote']) window.tabItems[m] = JSON.parse(JSON.stringify(window.tabItems['quote']));
-          else window.tabItems[m] = [{ name: "", unit: "Cái", qty: 1000, price: 0 }];
+          else window.tabItems[m] = [{ name: "", unit: "Cái", qty: 1, price: 0 }];
       }
       if (!window.currentOrderId) { window.currentOrderId = null; window.orderDates = null; }
   }
