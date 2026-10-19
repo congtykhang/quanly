@@ -62,19 +62,86 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 });
 
-window.processAI = () => {
-  if (window.activeDocMode !== 'quote') { window.showToast("AI chỉ hỗ trợ phân tích khi đang lập Báo giá mới!", "error"); return; }
-  const prompt = document.getElementById('aiPromptInput').value.trim(); const apiKey = window.SafeStore.get('docugen_cfg_ai'); const statusMsg = document.getElementById('aiStatusMsg');
-  if(!prompt) { window.showToast("Anh dán tin nhắn vô ô trống trước đã nghen!", "error"); return; }
-  if(!apiKey) { statusMsg.innerHTML = '<span class="text-rose-600 font-bold">Chưa có mã API Key! Anh vô phần Cài đặt thêm vô nghen.</span>'; return; }
+window.processAI = async () => {
+  if (window.activeDocMode !== 'quote') { 
+      window.showToast("AI chỉ hỗ trợ phân tích khi đang lập Báo giá mới!", "error"); 
+      return; 
+  }
   
-  statusMsg.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang nhờ AI đọc hiểu... (Demo Mode)';
-  setTimeout(() => {
-    statusMsg.innerHTML = '<span class="text-emerald-600 font-bold">Đã phân tích xong! Anh dò lại form nghen.</span>';
-    window.showToast("Nhập liệu AI thành công", "success");
-    document.getElementById('custName').value = "KHÁCH HÀNG TỪ ZALO"; document.getElementById('custPhone').value = "0988 777 666";
+  const promptText = document.getElementById('aiPromptInput').value.trim(); 
+  const apiKey = window.SafeStore.get('docugen_cfg_ai'); 
+  const statusMsg = document.getElementById('aiStatusMsg');
+  
+  if(!promptText) { 
+      window.showToast("Anh dán tin nhắn vô ô trống trước đã nghen!", "error"); 
+      return; 
+  }
+  if(!apiKey) { 
+      statusMsg.innerHTML = '<span class="text-rose-600 font-bold">Chưa có mã API Key! Anh vô phần Cài đặt (bánh răng) thêm vô nghen.</span>'; 
+      return; 
+  }
+  
+  statusMsg.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang nhờ Gemini AI đọc hiểu...';
+  
+  try {
+    // Ép AI đóng vai kế toán và xuất dữ liệu chuẩn JSON
+    const aiPrompt = `Hãy đóng vai một trợ lý kế toán cho tiệm in. Đọc đoạn tin nhắn sau của khách hàng và trích xuất thông tin ra định dạng JSON.
+    Cấu trúc JSON bắt buộc:
+    {
+      "custName": "Tên khách hàng hoặc tên công ty (để trống nếu không rõ)",
+      "custPhone": "Số điện thoại (để trống nếu không có)",
+      "deliveryAddress": "Địa chỉ giao hàng (để trống nếu không có)",
+      "items": [
+        { "name": "Tên hàng hóa kèm quy cách chi tiết (giấy, kích thước, cán màng...)", "unit": "Cái/Hộp/Tem/Cuốn...", "qty": số lượng (kiểu số nguyên, mặc định 1 nếu không rõ) }
+      ]
+    }
+    Tin nhắn của khách: "${promptText}"`;
+
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: aiPrompt }] }],
+        generationConfig: { 
+            response_mime_type: "application/json", // Bắt buộc AI trả về JSON thuần
+            temperature: 0.1 // Giữ nhiệt độ thấp để AI bám sát dữ liệu gốc, không tự bịa
+        }
+      })
+    });
+
+    if (!response.ok) {
+        throw new Error("Lỗi API Key hoặc kết nối mạng");
+    }
+
+    const data = await response.json();
+    const rawJsonStr = data.candidates[0].content.parts[0].text;
+    const result = JSON.parse(rawJsonStr);
+
+    // Điền dữ liệu khách hàng vào Form
+    if(result.custName) document.getElementById('custName').value = result.custName.toUpperCase();
+    if(result.custPhone) document.getElementById('custPhone').value = result.custPhone;
+    if(result.deliveryAddress) document.getElementById('deliveryAddress').value = result.deliveryAddress;
+    
+    // Gắn danh sách hàng hóa vào bảng
+    if(result.items && Array.isArray(result.items) && result.items.length > 0) {
+        window.itemsList = result.items.map(item => ({
+            name: item.name || "Hàng in",
+            unit: item.unit || "Cái",
+            qty: Number(item.qty) || 1,
+            price: 0 // Đơn giá để trống 0đ để mình tự điền/báo giá sau
+        }));
+        window.renderItemsTable();
+    }
+
+    statusMsg.innerHTML = '<span class="text-emerald-600 font-bold">Đã phân tích xong! Anh điền thêm đơn giá nhé.</span>';
+    window.showToast("AI nhập liệu thành công", "success");
     window.renderDocPreview();
-  }, 1500);
+    
+  } catch (error) {
+    console.error("Lỗi AI:", error);
+    statusMsg.innerHTML = '<span class="text-rose-600 font-bold">Lỗi phân tích AI. Anh kiểm tra lại API Key nhé!</span>';
+    window.showToast("Lỗi phân tích AI", "error");
+  }
 };
 
 window.selectCustomerById = function(id) {
