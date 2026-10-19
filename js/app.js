@@ -102,7 +102,7 @@ window.selectCustomerById = function(id) {
   window.showToast("Đã nạp thông tin KH", "success");
 };
 
-// ĐÃ SỬA CHUẨN: Khôi phục trọn bộ 3 tab (Báo giá, Đặt hàng, Giao hàng) từ Cloud
+// Khôi phục trọn bộ 3 tab (Báo giá, Đặt hàng, Giao hàng) từ Cloud
 window.loadOrder = (id) => {
   let orders = JSON.parse(window.SafeStore.get('docugen_orders') || '{}'); let o = orders[id]; if(!o) return;
   
@@ -112,7 +112,6 @@ window.loadOrder = (id) => {
   }
   window.orderDates = o.orderDates || { quote: o.date, order: null, delivery: null };
   
-  // Đọc dữ liệu 3 tab từ trên mây về, nếu không có tabItems (đơn cũ) thì mới tạo mới
   if (o.tabItems && (o.tabItems.quote || o.tabItems.order || o.tabItems.delivery)) {
       window.tabItems = JSON.parse(JSON.stringify(o.tabItems));
   } else {
@@ -305,7 +304,7 @@ window.renderItemsTable = function() {
 };
 
 window.updateItem = (i, f, el) => { window.itemsList[i][f] = (f==='qty'||f==='price') ? parseFloat(el.value)||0 : el.value; if(f === 'qty' || f === 'price') { const rowTotalEl = document.getElementById(`rowTotal_${i}`); if(rowTotalEl) rowTotalEl.innerText = Math.round(window.itemsList[i].qty * window.itemsList[i].price).toLocaleString('vi-VN'); } window.renderDocPreview(); };
-window.addItemRow = () => { window.itemsList.push({name:"", unit:"Cái", qty:1000, price:0}); window.renderItemsTable(); };
+window.addItemRow = () => { window.itemsList.push({name:"", unit:"Cái", qty:1, price:0}); window.renderItemsTable(); };
 window.removeItemRow = (i) => { window.itemsList.splice(i, 1); window.renderItemsTable(); };
 window.handleDepositAmountTyping = (el) => { const val = parseInt(el.value.replace(/[^\d]/g, ''))||0; el.value = val.toLocaleString('vi-VN'); window.renderDocPreview(); };
 
@@ -324,6 +323,7 @@ function docTienBangChu(amount) {
   result = result.trim().replace(/\s+/g, ' '); return result.charAt(0).toUpperCase() + result.slice(1) + " đồng chẵn.";
 }
 
+// BẢN VẼ A4 CHỐT HẠ - CÓ ĐỔI CHỮ CỌC THEO TỪNG TAB
 window.renderDocPreview = function() {
   const pDoc = document.getElementById('printDocument'); if(!pDoc) return;
   let subtotal = 0; window.itemsList.forEach(it => subtotal += (it.qty*it.price));
@@ -371,10 +371,17 @@ window.renderDocPreview = function() {
   const tEl = document.getElementById('docTerms');
   const termsText = tEl ? tEl.value.trim() : ''; const termsHtml = termsText ? `<div style="margin-bottom:15px; white-space: pre-wrap; font-size:${isA6?'9px':(isA5?'11px':'13px')};"><strong>Ghi chú:</strong><br>${termsText}</div>` : '';
   
+  // LOGIC HIỂN THỊ CHỮ CỌC THEO TAB NHƯ ANH YÊU CẦU
+  let lblDeposit = window.activeDocMode === 'quote' ? 'Đề nghị đặt cọc:' : (window.activeDocMode === 'delivery' ? 'Đã thanh toán (Cọc):' : 'Đã thanh toán / Đặt cọc:');
+  let lblRemain = window.activeDocMode === 'delivery' ? 'CẦN THU THÊM:' : 'Còn lại:';
+
   if(!hidePrice && !isNoSum && !isA6) {
     if(vatVal > 0) tbodyStr += `<tr><td colspan="5" style="border:1px solid #000;text-align:right;font-weight:bold;padding:${cellP}">Cộng tiền hàng:</td><td style="border:1px solid #000;text-align:right;font-weight:bold;padding:${cellP}">${subtotal.toLocaleString('vi-VN')}</td></tr><tr><td colspan="5" style="border:1px solid #000;text-align:right;font-weight:bold;padding:${cellP}">Thuế VAT (${vatVal}%):</td><td style="border:1px solid #000;text-align:right;font-weight:bold;padding:${cellP}">${vatAmount.toLocaleString('vi-VN')}</td></tr>`;
     tbodyStr += `<tr><td colspan="5" style="border:1px solid #000;text-align:right;font-weight:bold;font-size:${isA5?'11px':'14px'};padding:${cellP};color:#b91c1c;">TỔNG CỘNG THANH TOÁN:</td><td style="border:1px solid #000;text-align:right;font-weight:bold;font-size:${isA5?'11px':'14px'};padding:${cellP};color:#b91c1c;">${grandTotal.toLocaleString('vi-VN')} đ</td></tr>`;
-    if(depAmount > 0 && window.activeDocMode !== 'delivery' && window.activeDocMode !== 'quote') { tbodyStr += `<tr><td colspan="5" style="border:1px solid #000;text-align:right;font-weight:bold;padding:${cellP}">Đặt cọc trước:</td><td style="border:1px solid #000;text-align:right;font-weight:bold;color:#1e3a8a;padding:${cellP}">${depAmount.toLocaleString('vi-VN')} đ</td></tr><tr><td colspan="5" style="border:1px solid #000;text-align:right;font-weight:bold;padding:${cellP}">Còn lại:</td><td style="border:1px solid #000;text-align:right;font-weight:bold;color:#b91c1c;padding:${cellP}">${remain.toLocaleString('vi-VN')} đ</td></tr>`; }
+    if(depAmount > 0) { 
+      tbodyStr += `<tr><td colspan="5" style="border:1px solid #000;text-align:right;font-weight:bold;padding:${cellP}">${lblDeposit}</td><td style="border:1px solid #000;text-align:right;font-weight:bold;color:#1e3a8a;padding:${cellP}">${depAmount.toLocaleString('vi-VN')} đ</td></tr>`;
+      tbodyStr += `<tr><td colspan="5" style="border:1px solid #000;text-align:right;font-weight:bold;padding:${cellP}">${lblRemain}</td><td style="border:1px solid #000;text-align:right;font-weight:bold;color:#b91c1c;padding:${cellP}">${remain.toLocaleString('vi-VN')} đ</td></tr>`; 
+    }
   }
   
   let headerHtml = '';
