@@ -84,49 +84,43 @@ window.processAI = async () => {
   statusMsg.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang nhờ Gemini AI đọc hiểu...';
   
   try {
-    const aiPrompt = `Trích xuất thông tin khách hàng và đơn hàng từ tin nhắn sau sang định dạng JSON.
-    Cấu trúc JSON bắt buộc:
+    const aiPrompt = `Đọc tin nhắn sau và trích xuất thành định dạng JSON thuần túy (không kèm markdown, không giải thích).
+    Cấu trúc bắt buộc:
     {
-      "custName": "Tên khách hàng/công ty (nếu có)",
-      "custPhone": "Số điện thoại (nếu có)",
+      "custName": "Tên KH hoặc công ty (nếu có)",
+      "custPhone": "SĐT (nếu có)",
       "deliveryAddress": "Địa chỉ giao hàng (nếu có)",
       "items": [
-        { "name": "Tên hàng hóa và quy cách", "unit": "Cái/Hộp/Tem...", "qty": số_lượng_chỉ_ghi_số }
+        { "name": "Tên hàng & quy cách chi tiết", "unit": "Cái/Hộp...", "qty": số_lượng_chỉ_ghi_số_nguyên }
       ]
     }
     Tin nhắn: "${promptText}"`;
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`, {
+    // Sử dụng bản chính thức v1 và gọi model gemini-1.5-flash (mượt và nhanh nhất)
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: aiPrompt }] }],
-        generationConfig: { 
-            temperature: 0.1 
-        }
+        contents: [{ parts: [{ text: aiPrompt }] }]
       })
     });
 
     const data = await response.json();
 
-    // Bắt lỗi rành mạch từ Google
     if (!response.ok) {
         throw new Error(data.error?.message || "Lỗi kết nối API với Google");
     }
 
     let rawJsonStr = data.candidates[0].content.parts[0].text;
     
-    // BỘ LỌC THÔNG MINH: Tự động gọt bỏ khung markdown rác của AI
+    // Thuật toán tự động gọt rác, tương thích mọi model
     rawJsonStr = rawJsonStr.replace(/```json/gi, '').replace(/```/g, '').trim();
-    
     const result = JSON.parse(rawJsonStr);
 
-    // Điền dữ liệu khách hàng vào Form
     if(result.custName) document.getElementById('custName').value = result.custName.toUpperCase();
     if(result.custPhone) document.getElementById('custPhone').value = result.custPhone;
     if(result.deliveryAddress) document.getElementById('deliveryAddress').value = result.deliveryAddress;
     
-    // Gắn danh sách hàng hóa vào bảng
     if(result.items && Array.isArray(result.items) && result.items.length > 0) {
         window.itemsList = result.items.map(item => ({
             name: item.name || "Hàng in",
@@ -143,7 +137,6 @@ window.processAI = async () => {
     
   } catch (error) {
     console.error("Lỗi AI chi tiết:", error);
-    // In thẳng lỗi ra màn hình để biết đường bắt mạch
     statusMsg.innerHTML = `<span class="text-rose-600 font-bold">Lỗi: ${error.message}</span>`;
     window.showToast("Lỗi phân tích AI", "error");
   }
