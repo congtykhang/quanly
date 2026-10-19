@@ -82,9 +82,30 @@ window.processAI = async () => {
       return; 
   }
   
-  statusMsg.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang nhờ Gemini AI đọc hiểu...';
+  statusMsg.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang tự động dò tìm AI phù hợp với tài khoản...';
   
   try {
+    // BƯỚC 1: TỰ ĐỘNG HỎI GOOGLE DANH SÁCH MODEL ĐƯỢC PHÉP DÙNG
+    const checkRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+    if (!checkRes.ok) throw new Error("Mã API Key không hợp lệ hoặc bị Google khóa!");
+    
+    const checkData = await checkRes.json();
+    const models = checkData.models || [];
+    let selectedModelName = "models/gemini-1.5-flash"; // Mặc định
+    
+    // Tìm model tốt nhất có sẵn trong tài khoản của anh
+    const bestModel = models.find(m => m.name.includes("gemini-1.5-flash") && m.supportedGenerationMethods.includes("generateContent"));
+    const backupModel = models.find(m => m.name.includes("gemini") && m.supportedGenerationMethods.includes("generateContent"));
+    
+    if (bestModel) {
+        selectedModelName = bestModel.name;
+    } else if (backupModel) {
+        selectedModelName = backupModel.name;
+    }
+
+    statusMsg.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Đang dùng ${selectedModelName.replace('models/','')} để đọc tin nhắn...`;
+
+    // BƯỚC 2: PHÂN TÍCH ĐƠN HÀNG BẰNG CHÍNH MODEL VỪA TÌM ĐƯỢC
     const aiPrompt = `Đọc tin nhắn sau và trích xuất thành định dạng JSON thuần túy (không kèm markdown, không giải thích).
     Cấu trúc bắt buộc:
     {
@@ -97,8 +118,7 @@ window.processAI = async () => {
     }
     Tin nhắn: "${promptText}"`;
 
-    // LINK API V1 CHUẨN XÁC
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/${selectedModelName}:generateContent?key=${apiKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -109,12 +129,12 @@ window.processAI = async () => {
     const data = await response.json();
 
     if (!response.ok) {
-        throw new Error(data.error?.message || "Lỗi kết nối API với Google");
+        throw new Error(data.error?.message || "Google từ chối xử lý dữ liệu");
     }
 
     let rawJsonStr = data.candidates[0].content.parts[0].text;
     
-    // Gọt rác
+    // Thuật toán gọt rác thông minh
     rawJsonStr = rawJsonStr.replace(/```json/gi, '').replace(/```/g, '').trim();
     const result = JSON.parse(rawJsonStr);
 
