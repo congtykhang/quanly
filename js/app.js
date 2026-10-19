@@ -416,14 +416,66 @@ window.renderDocPreview = function() {
     </div>`;
 };
 
+// ĐÃ SỬA: Thêm cấu hình chống dư trang PDF
 window.exportToPdf = async function() {
   const pSize = window.activeDocMode === 'delivery' ? window.deliveryPaperSize : (window.activeDocMode === 'order' && window.deliveryPaperSize ? window.deliveryPaperSize : 'A4');
   let format = 'a4'; let orientation = 'portrait';
   if(pSize === 'A6-portrait') format = 'a6'; else if(pSize === 'A5-landscape') { format = 'a5'; orientation = 'landscape'; } else if(pSize === 'A5-portrait') format = 'a5';
-  const opt = { margin:0, filename:`${document.getElementById('docNumberInput').value.replace('Sẽ cấp tự động khi Lưu', 'Phieu_Moi')}.pdf`, image:{type:'jpeg',quality:0.98}, html2canvas:{scale:2}, jsPDF:{unit:'mm', format: format, orientation: orientation} };
-  const btn = document.getElementById('headerExportPdfBtn'); btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang tải...';
-  await html2pdf().set(opt).from(document.getElementById('printDocument')).save();
-  btn.innerHTML = '<i class="fa-solid fa-file-pdf"></i> Tải PDF';
+  
+  const opt = { 
+    margin: 0, 
+    filename: `${document.getElementById('docNumberInput').value.replace('Sẽ cấp tự động khi Lưu', 'Phieu_Moi')}.pdf`, 
+    image: { type: 'jpeg', quality: 0.98 }, 
+    html2canvas: { scale: 2, scrollY: 0 }, 
+    jsPDF: { unit: 'mm', format: format, orientation: orientation, compress: true } 
+  };
+  
+  const btn = document.getElementById('headerExportPdfBtn'); 
+  const originalText = btn.innerHTML;
+  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang tải PDF...';
+  
+  try {
+    await html2pdf().set(opt).from(document.getElementById('printDocument')).save();
+  } catch (error) {
+    console.error("Lỗi xuất PDF:", error);
+    if(window.showToast) window.showToast("Lỗi khi xuất PDF!", "error");
+  } finally {
+    btn.innerHTML = originalText;
+  }
+};
+
+// TÍNH NĂNG MỚI: XUẤT RA FILE ẢNH (.JPG)
+window.exportToImage = async function() {
+  const printDoc = document.getElementById('printDocument');
+  if (!printDoc) return;
+  
+  // Tạm thời bỏ giới hạn chiều cao để chụp đủ hình nếu nội dung dài
+  const oldOverflow = printDoc.style.overflow;
+  printDoc.style.overflow = 'visible';
+  
+  const btn = document.getElementById('headerExportImageBtn');
+  if(btn) {
+    btn.dataset.originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang tải Ảnh...';
+  }
+
+  try {
+    const canvas = await html2canvas(printDoc, { scale: 2, useCORS: true });
+    const imgData = canvas.toDataURL('image/jpeg', 0.9);
+    
+    const link = document.createElement('a');
+    link.href = imgData;
+    link.download = `${document.getElementById('docNumberInput').value.replace('Sẽ cấp tự động khi Lưu', 'Phieu_Moi')}.jpg`;
+    link.click();
+    
+    if(window.showToast) window.showToast("Đã tải ảnh thành công!", "success");
+  } catch (error) {
+    console.error("Lỗi xuất ảnh:", error);
+    if(window.showToast) window.showToast("Lỗi khi xuất ảnh!", "error");
+  } finally {
+    printDoc.style.overflow = oldOverflow; // Trả lại style cũ
+    if(btn) btn.innerHTML = btn.dataset.originalText;
+  }
 };
 
 window.switchViewTab = (t) => { const f = document.getElementById('section-form'); const p = document.getElementById('section-preview'); if(f) f.classList.toggle('hidden', t!=='form'); if(p) p.classList.toggle('hidden', t==='form'); };
