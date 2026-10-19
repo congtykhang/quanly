@@ -97,8 +97,8 @@ window.processAI = async () => {
     }
     Tin nhắn: "${promptText}"`;
 
-    // Chốt API ổn định nhất cho mọi tài khoản
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`, {
+    // LINK API V1 CHUẨN XÁC
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
