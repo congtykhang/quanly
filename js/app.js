@@ -62,6 +62,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 });
 
+// HÀM GỌI API GEMINI ĐÃ ĐƯỢC LÀM SẠCH DUY NHẤT 1 BẢN
 window.processAI = async () => {
   if (window.activeDocMode !== 'quote') { 
       window.showToast("AI chỉ hỗ trợ phân tích khi đang lập Báo giá mới!", "error"); 
@@ -96,8 +97,8 @@ window.processAI = async () => {
     }
     Tin nhắn: "${promptText}"`;
 
-    // Sử dụng bản chính thức v1 và gọi model gemini-1.5-flash (mượt và nhanh nhất)
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+    // Chốt API ổn định nhất cho mọi tài khoản
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -113,7 +114,7 @@ window.processAI = async () => {
 
     let rawJsonStr = data.candidates[0].content.parts[0].text;
     
-    // Thuật toán tự động gọt rác, tương thích mọi model
+    // Gọt rác
     rawJsonStr = rawJsonStr.replace(/```json/gi, '').replace(/```/g, '').trim();
     const result = JSON.parse(rawJsonStr);
 
@@ -304,10 +305,7 @@ window.updateModeUI = function() {
   const isNoSum = (window.activeDocMode === 'quote' && window.quoteSumMode === 'options');
   const finPanel = document.getElementById('financialSummaryPanel'); if(finPanel) finPanel.classList.toggle('hidden', isNoSum); 
   const noSumPanel = document.getElementById('noSumSummaryBanner'); if(noSumPanel) noSumPanel.classList.toggle('hidden', !isNoSum);
-  
-  // ĐÃ SỬA CHỖ NÀY: Bỏ lệnh ẩn khung Đặt Cọc, để nó luôn hiển thị ở mọi Tab
   const depBlock = document.getElementById('depositBlockUI'); if(depBlock) depBlock.classList.remove('hidden');
-  
   const depPctBox = document.getElementById('depositPercentBox'); if(depPctBox) depPctBox.classList.toggle('hidden', window.depositType !== 'percent'); 
   const depAmtBox = document.getElementById('depositAmountBox'); if(depAmtBox) depAmtBox.classList.toggle('hidden', window.depositType === 'percent');
   
@@ -362,7 +360,6 @@ window.resetCustomerForm = () => {
   window.initDefaultDocMeta(); window.renderItemsTable(); window.renderDocPreview(); window.showToast("Đã tạo form mới", "info");
 };
 
-// VÁ LỖI HIỂN THỊ SỐ LẺ BẰNG CÁCH CHUẨN HÓA FORMAT SỐ TIỀN TRONG BẢNG NHẬP
 window.renderItemsTable = function() {
   const tbody = document.getElementById('itemsTableBody'); if(!tbody) return; tbody.innerHTML = ''; const isPriceReadOnly = window.activeDocMode !== 'quote';
   window.itemsList.forEach((it, i) => {
@@ -405,7 +402,6 @@ window.updateItem = (i, f, el) => {
     if (f === 'total') {
         const newTotal = parseFloat(el.value) || 0;
         const qty = window.itemsList[i].qty || 1;
-        // Bắt lỗi số thập phân dài: Chỉ cho tối đa 3 số thập phân khi tính ngược
         window.itemsList[i].price = Math.round((newTotal / qty) * 1000) / 1000;
         const priceEl = document.getElementById(`priceInput_${i}`);
         if(priceEl) priceEl.value = window.itemsList[i].price;
@@ -419,7 +415,6 @@ window.updateItem = (i, f, el) => {
     window.renderDocPreview(); 
 };
 
-// TÍNH TOÁN NGƯỢC VAT CHUẨN XÁC
 window.reverseCalc = (i) => {
     const vatEl = document.getElementById('vatSelect');
     const vat = vatEl ? parseFloat(vatEl.value) : 0;
@@ -460,13 +455,10 @@ function docTienBangChu(amount) {
   result = result.trim().replace(/\s+/g, ' '); return result.charAt(0).toUpperCase() + result.slice(1) + " đồng chẵn.";
 }
 
-// BẢN VẼ A4 CHỐT HẠ - CÓ ĐỔI CHỮ CỌC THEO TỪNG TAB, HỖ TRỢ XUỐNG DÒNG VÀ ÉP TRÒN TIỀN
 window.renderDocPreview = function() {
   const pDoc = document.getElementById('printDocument'); if(!pDoc) return;
   
   let subtotal = 0; window.itemsList.forEach(it => subtotal += ((parseFloat(it.qty)||0) * (parseFloat(it.price)||0)));
-  
-  // ÉP LÀM TRÒN TỔNG TIỀN HÀNG: Cắt đứt hoàn toàn mọi số thập phân lẻ tẻ
   subtotal = Math.round(subtotal); 
   
   const vatEl = document.getElementById('vatSelect'); const vatVal = vatEl ? parseFloat(vatEl.value) : 0; 
