@@ -294,19 +294,20 @@ window.resetCustomerForm = () => {
   window.initDefaultDocMeta(); window.renderItemsTable(); window.renderDocPreview(); window.showToast("Đã tạo form mới", "info");
 };
 
-// ĐÃ NÂNG CẤP: Thay Input bằng Textarea co giãn, Cho phép sửa Thành Tiền
+// VÁ LỖI HIỂN THỊ SỐ LẺ BẰNG CÁCH CHUẨN HÓA FORMAT SỐ TIỀN TRONG BẢNG NHẬP
 window.renderItemsTable = function() {
   const tbody = document.getElementById('itemsTableBody'); if(!tbody) return; tbody.innerHTML = ''; const isPriceReadOnly = window.activeDocMode !== 'quote';
   window.itemsList.forEach((it, i) => {
     const totalVal = Math.round((it.qty || 0) * (it.price || 0));
-    
+    const formattedDisplayPrice = Number(it.price).toLocaleString('vi-VN', { maximumFractionDigits: 3 });
+
     const priceInputHtml = isPriceReadOnly 
-        ? `<div class="relative w-full"><i class="fa-solid fa-lock absolute left-2 top-2 text-slate-400 text-[9px]"></i><input type="number" value="${it.price}" readonly class="w-full text-right pl-5 bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200 rounded p-1 text-xs font-mono"></div>` 
-        : `<input type="number" id="priceInput_${i}" value="${it.price}" oninput="window.updateItem(${i}, 'price', this)" class="w-full text-right bg-transparent text-blue-700 border border-slate-300 rounded p-1 text-xs font-mono font-bold outline-none focus:ring-1 focus:ring-blue-500">`;
+        ? `<div class="relative w-full"><i class="fa-solid fa-lock absolute left-2 top-2 text-slate-400 text-[9px]"></i><input type="text" value="${formattedDisplayPrice}" readonly class="w-full text-right pl-5 bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200 rounded p-1 text-xs font-mono"></div>` 
+        : `<input type="number" step="any" id="priceInput_${i}" value="${it.price}" oninput="window.updateItem(${i}, 'price', this)" class="w-full text-right bg-transparent text-blue-700 border border-slate-300 rounded p-1 text-xs font-mono font-bold outline-none focus:ring-1 focus:ring-blue-500">`;
         
     const totalInputHtml = isPriceReadOnly
         ? `<div class="text-right font-mono font-bold text-slate-700">${totalVal.toLocaleString('vi-VN')}</div>`
-        : `<div class="flex items-center gap-1"><input type="number" id="totalInput_${i}" value="${totalVal}" oninput="window.updateItem(${i}, 'total', this)" class="w-full text-right bg-transparent text-rose-600 border border-slate-300 rounded p-1 text-xs font-mono font-bold outline-none focus:ring-1 focus:ring-rose-500"><button onclick="window.reverseCalc(${i})" title="Tính ngược từ giá có VAT" class="text-rose-500 hover:text-rose-700 px-1"><i class="fa-solid fa-calculator"></i></button></div>`;
+        : `<div class="flex items-center gap-1"><input type="number" step="any" id="totalInput_${i}" value="${totalVal}" oninput="window.updateItem(${i}, 'total', this)" class="w-full text-right bg-transparent text-rose-600 border border-slate-300 rounded p-1 text-xs font-mono font-bold outline-none focus:ring-1 focus:ring-rose-500"><button onclick="window.reverseCalc(${i})" title="Tính ngược từ giá có VAT" class="text-rose-500 hover:text-rose-700 px-1"><i class="fa-solid fa-calculator"></i></button></div>`;
 
     tbody.innerHTML += `
     <tr class="hover:bg-slate-50 border-b border-slate-100 transition-colors">
@@ -315,14 +316,13 @@ window.renderItemsTable = function() {
             <textarea oninput="this.style.height=''; this.style.height=this.scrollHeight+'px'; window.updateItem(${i}, 'name', this)" class="w-full bg-transparent border border-slate-300 rounded p-1 text-xs outline-none focus:ring-1 focus:ring-blue-500 resize-none overflow-hidden min-h-[32px] whitespace-pre-wrap leading-tight block">${it.name}</textarea>
         </td>
         <td class="p-2 align-top pt-2"><input type="text" value="${it.unit}" oninput="window.updateItem(${i}, 'unit', this)" class="w-full text-center bg-transparent border border-slate-300 rounded p-1 text-xs outline-none focus:ring-1 focus:ring-blue-500"></td>
-        <td class="p-2 align-top pt-2"><input type="number" id="qtyInput_${i}" value="${it.qty}" oninput="window.updateItem(${i}, 'qty', this)" class="w-full text-right bg-transparent border border-slate-300 rounded p-1 text-xs outline-none focus:ring-1 focus:ring-blue-500"></td>
+        <td class="p-2 align-top pt-2"><input type="number" step="any" id="qtyInput_${i}" value="${it.qty}" oninput="window.updateItem(${i}, 'qty', this)" class="w-full text-right bg-transparent border border-slate-300 rounded p-1 text-xs outline-none focus:ring-1 focus:ring-blue-500"></td>
         <td class="p-2 align-top pt-2">${priceInputHtml}</td>
         <td class="p-2 align-top pt-2">${totalInputHtml}</td>
         <td class="p-2 text-center align-top pt-3"><button onclick="window.removeItemRow(${i})" class="text-rose-400 hover:text-rose-600 transition"><i class="fa-solid fa-xmark"></i></button></td>
     </tr>`;
   });
   
-  // Tự động kéo dãn textarea khi vừa load xong
   setTimeout(() => {
     document.querySelectorAll('#itemsTableBody textarea').forEach(el => {
         el.style.height = 'auto';
@@ -333,12 +333,12 @@ window.renderItemsTable = function() {
   window.renderDocPreview();
 };
 
-// ĐÃ NÂNG CẤP: Xử lý tính toán 2 chiều (Sửa Giá -> ra Tiền / Sửa Tiền -> ra Giá)
 window.updateItem = (i, f, el) => { 
     if (f === 'total') {
         const newTotal = parseFloat(el.value) || 0;
         const qty = window.itemsList[i].qty || 1;
-        window.itemsList[i].price = newTotal / qty;
+        // Bắt lỗi số thập phân dài: Chỉ cho tối đa 3 số thập phân khi tính ngược
+        window.itemsList[i].price = Math.round((newTotal / qty) * 1000) / 1000;
         const priceEl = document.getElementById(`priceInput_${i}`);
         if(priceEl) priceEl.value = window.itemsList[i].price;
     } else {
@@ -351,7 +351,7 @@ window.updateItem = (i, f, el) => {
     window.renderDocPreview(); 
 };
 
-// ĐÃ NÂNG CẤP: Nút Máy tính ma thuật (Bóc tách VAT ngược)
+// TÍNH TOÁN NGƯỢC VAT CHUẨN XÁC
 window.reverseCalc = (i) => {
     const vatEl = document.getElementById('vatSelect');
     const vat = vatEl ? parseFloat(vatEl.value) : 0;
@@ -367,7 +367,7 @@ window.reverseCalc = (i) => {
 
     const preTaxTotal = postTaxTotal / (1 + vat / 100);
     const qty = window.itemsList[i].qty || 1;
-    window.itemsList[i].price = preTaxTotal / qty;
+    window.itemsList[i].price = Math.round((preTaxTotal / qty) * 1000) / 1000;
 
     window.renderItemsTable(); 
     if(window.showToast) window.showToast("Đã bóc tách VAT và tính ngược đơn giá thành công!", "success");
@@ -392,13 +392,18 @@ function docTienBangChu(amount) {
   result = result.trim().replace(/\s+/g, ' '); return result.charAt(0).toUpperCase() + result.slice(1) + " đồng chẵn.";
 }
 
-// BẢN VẼ A4 CHỐT HẠ - CÓ ĐỔI CHỮ CỌC THEO TỪNG TAB VÀ HỖ TRỢ XUỐNG DÒNG
+// BẢN VẼ A4 CHỐT HẠ - CÓ ĐỔI CHỮ CỌC THEO TỪNG TAB, HỖ TRỢ XUỐNG DÒNG VÀ ÉP TRÒN TIỀN
 window.renderDocPreview = function() {
   const pDoc = document.getElementById('printDocument'); if(!pDoc) return;
-  let subtotal = 0; window.itemsList.forEach(it => subtotal += (it.qty*it.price));
+  
+  let subtotal = 0; window.itemsList.forEach(it => subtotal += ((parseFloat(it.qty)||0) * (parseFloat(it.price)||0)));
+  
+  // ÉP LÀM TRÒN TỔNG TIỀN HÀNG: Cắt đứt hoàn toàn mọi số thập phân lẻ tẻ
+  subtotal = Math.round(subtotal); 
   
   const vatEl = document.getElementById('vatSelect'); const vatVal = vatEl ? parseFloat(vatEl.value) : 0; 
-  const vatAmount = vatVal > 0 ? Math.round(subtotal * (vatVal/100)) : 0; const grandTotal = subtotal + vatAmount;
+  const vatAmount = vatVal > 0 ? Math.round(subtotal * (vatVal/100)) : 0; 
+  const grandTotal = subtotal + vatAmount;
   
   const dpPctEl = document.getElementById('depositPercent'); const dpAmtEl = document.getElementById('depositFixedAmountInput');
   let depAmount = window.depositType === 'percent' ? Math.round(grandTotal * ((parseFloat(dpPctEl?dpPctEl.value:0)||0)/100)) : parseInt((dpAmtEl?dpAmtEl.value:'0').replace(/[^\d]/g,''))||0;
@@ -433,10 +438,12 @@ window.renderDocPreview = function() {
 
   let tbodyStr = '';
   window.itemsList.forEach((it, i) => {
-    // Biến đổi dấu xuống dòng thành thẻ <br> để in ra giấy
     const formattedName = (it.name || '').replace(/\n/g, '<br>');
+    const displayPrice = Number(it.price).toLocaleString('vi-VN', { maximumFractionDigits: 2 });
+    const displayRowTotal = Math.round((parseFloat(it.qty)||0) * (parseFloat(it.price)||0)).toLocaleString('vi-VN');
+
     if(hidePrice) { tbodyStr += `<tr><td style="border:1px solid #000;text-align:center;padding:${cellP};vertical-align:top;">${i+1}</td><td style="border:1px solid #000;padding:${cellP};vertical-align:top;"><strong>${formattedName}</strong></td><td style="border:1px solid #000;text-align:center;padding:${cellP};vertical-align:top;">${it.unit}</td><td style="border:1px solid #000;text-align:center;padding:${cellP};vertical-align:top;">${it.qty.toLocaleString('vi-VN')}</td>${isA6 ? '' : `<td style="border:1px solid #000;padding:${cellP}"></td>`}</tr>`; }
-    else { tbodyStr += `<tr><td style="border:1px solid #000;text-align:center;padding:${cellP};vertical-align:top;">${i+1}</td><td style="border:1px solid #000;padding:${cellP};vertical-align:top;"><strong>${formattedName}</strong></td><td style="border:1px solid #000;text-align:center;padding:${cellP};vertical-align:top;">${it.unit}</td><td style="border:1px solid #000;text-align:center;padding:${cellP};vertical-align:top;">${it.qty.toLocaleString('vi-VN')}</td><td style="border:1px solid #000;text-align:right;padding:${cellP};vertical-align:top;">${it.price.toLocaleString('vi-VN')}</td><td style="border:1px solid #000;text-align:right;font-weight:bold;padding:${cellP};vertical-align:top;">${Math.round(it.qty*it.price).toLocaleString('vi-VN')}</td></tr>`; }
+    else { tbodyStr += `<tr><td style="border:1px solid #000;text-align:center;padding:${cellP};vertical-align:top;">${i+1}</td><td style="border:1px solid #000;padding:${cellP};vertical-align:top;"><strong>${formattedName}</strong></td><td style="border:1px solid #000;text-align:center;padding:${cellP};vertical-align:top;">${it.unit}</td><td style="border:1px solid #000;text-align:center;padding:${cellP};vertical-align:top;">${it.qty.toLocaleString('vi-VN')}</td><td style="border:1px solid #000;text-align:right;padding:${cellP};vertical-align:top;">${displayPrice}</td><td style="border:1px solid #000;text-align:right;font-weight:bold;padding:${cellP};vertical-align:top;">${displayRowTotal}</td></tr>`; }
   });
   
   const tEl = document.getElementById('docTerms');
