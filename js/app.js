@@ -239,7 +239,10 @@ window.updateModeUI = function() {
   const isNoSum = (window.activeDocMode === 'quote' && window.quoteSumMode === 'options');
   const finPanel = document.getElementById('financialSummaryPanel'); if(finPanel) finPanel.classList.toggle('hidden', isNoSum); 
   const noSumPanel = document.getElementById('noSumSummaryBanner'); if(noSumPanel) noSumPanel.classList.toggle('hidden', !isNoSum);
-  const depBlock = document.getElementById('depositBlockUI'); if(depBlock) depBlock.classList.toggle('hidden', window.activeDocMode === 'quote');
+  
+  // ĐÃ SỬA CHỖ NÀY: Bỏ lệnh ẩn khung Đặt Cọc, để nó luôn hiển thị ở mọi Tab
+  const depBlock = document.getElementById('depositBlockUI'); if(depBlock) depBlock.classList.remove('hidden');
+  
   const depPctBox = document.getElementById('depositPercentBox'); if(depPctBox) depPctBox.classList.toggle('hidden', window.depositType !== 'percent'); 
   const depAmtBox = document.getElementById('depositAmountBox'); if(depAmtBox) depAmtBox.classList.toggle('hidden', window.depositType === 'percent');
   
