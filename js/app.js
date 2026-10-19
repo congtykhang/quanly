@@ -84,18 +84,17 @@ window.processAI = async () => {
   statusMsg.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang nhờ Gemini AI đọc hiểu...';
   
   try {
-    // Ép AI đóng vai kế toán và xuất dữ liệu chuẩn JSON
-    const aiPrompt = `Hãy đóng vai một trợ lý kế toán cho tiệm in. Đọc đoạn tin nhắn sau của khách hàng và trích xuất thông tin ra định dạng JSON.
+    const aiPrompt = `Trích xuất thông tin khách hàng và đơn hàng từ tin nhắn sau sang định dạng JSON.
     Cấu trúc JSON bắt buộc:
     {
-      "custName": "Tên khách hàng hoặc tên công ty (để trống nếu không rõ)",
-      "custPhone": "Số điện thoại (để trống nếu không có)",
-      "deliveryAddress": "Địa chỉ giao hàng (để trống nếu không có)",
+      "custName": "Tên khách hàng/công ty (nếu có)",
+      "custPhone": "Số điện thoại (nếu có)",
+      "deliveryAddress": "Địa chỉ giao hàng (nếu có)",
       "items": [
-        { "name": "Tên hàng hóa kèm quy cách chi tiết (giấy, kích thước, cán màng...)", "unit": "Cái/Hộp/Tem/Cuốn...", "qty": số lượng (kiểu số nguyên, mặc định 1 nếu không rõ) }
+        { "name": "Tên hàng hóa và quy cách", "unit": "Cái/Hộp/Tem...", "qty": số_lượng_chỉ_ghi_số }
       ]
     }
-    Tin nhắn của khách: "${promptText}"`;
+    Tin nhắn: "${promptText}"`;
 
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
       method: 'POST',
@@ -103,18 +102,23 @@ window.processAI = async () => {
       body: JSON.stringify({
         contents: [{ parts: [{ text: aiPrompt }] }],
         generationConfig: { 
-            response_mime_type: "application/json", // Bắt buộc AI trả về JSON thuần
-            temperature: 0.1 // Giữ nhiệt độ thấp để AI bám sát dữ liệu gốc, không tự bịa
+            temperature: 0.1 
         }
       })
     });
 
+    const data = await response.json();
+
+    // Bắt lỗi rành mạch từ Google
     if (!response.ok) {
-        throw new Error("Lỗi API Key hoặc kết nối mạng");
+        throw new Error(data.error?.message || "Lỗi kết nối API với Google");
     }
 
-    const data = await response.json();
-    const rawJsonStr = data.candidates[0].content.parts[0].text;
+    let rawJsonStr = data.candidates[0].content.parts[0].text;
+    
+    // BỘ LỌC THÔNG MINH: Tự động gọt bỏ khung markdown rác của AI
+    rawJsonStr = rawJsonStr.replace(/```json/gi, '').replace(/```/g, '').trim();
+    
     const result = JSON.parse(rawJsonStr);
 
     // Điền dữ liệu khách hàng vào Form
@@ -128,7 +132,7 @@ window.processAI = async () => {
             name: item.name || "Hàng in",
             unit: item.unit || "Cái",
             qty: Number(item.qty) || 1,
-            price: 0 // Đơn giá để trống 0đ để mình tự điền/báo giá sau
+            price: 0 
         }));
         window.renderItemsTable();
     }
@@ -138,8 +142,9 @@ window.processAI = async () => {
     window.renderDocPreview();
     
   } catch (error) {
-    console.error("Lỗi AI:", error);
-    statusMsg.innerHTML = '<span class="text-rose-600 font-bold">Lỗi phân tích AI. Anh kiểm tra lại API Key nhé!</span>';
+    console.error("Lỗi AI chi tiết:", error);
+    // In thẳng lỗi ra màn hình để biết đường bắt mạch
+    statusMsg.innerHTML = `<span class="text-rose-600 font-bold">Lỗi: ${error.message}</span>`;
     window.showToast("Lỗi phân tích AI", "error");
   }
 };
