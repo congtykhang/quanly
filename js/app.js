@@ -32,7 +32,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       .overflow-x-auto { -webkit-overflow-scrolling: touch; }
       #itemsTableBody td { padding: 6px 4px !important; }
       #itemsTableBody input { min-width: 70px !important; padding: 10px 8px !important; font-size: 16px !important; background-color: #f8fafc !important; }
-      #itemsTableBody input[type="text"] { min-width: 140px !important; }
+      #itemsTableBody textarea { font-size: 16px !important; padding: 10px !important; }
       #section-form .grid { gap: 16px !important; }
     }
   `;
@@ -294,16 +294,85 @@ window.resetCustomerForm = () => {
   window.initDefaultDocMeta(); window.renderItemsTable(); window.renderDocPreview(); window.showToast("Đã tạo form mới", "info");
 };
 
+// ĐÃ NÂNG CẤP: Thay Input bằng Textarea co giãn, Cho phép sửa Thành Tiền
 window.renderItemsTable = function() {
   const tbody = document.getElementById('itemsTableBody'); if(!tbody) return; tbody.innerHTML = ''; const isPriceReadOnly = window.activeDocMode !== 'quote';
   window.itemsList.forEach((it, i) => {
-    const priceInputHtml = isPriceReadOnly ? `<div class="relative w-full"><i class="fa-solid fa-lock absolute left-2 top-2 text-slate-400 text-[9px]"></i><input type="number" value="${it.price}" readonly class="w-full text-right pl-5 bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200 rounded p-1 text-xs font-mono"></div>` : `<input type="number" value="${it.price}" oninput="window.updateItem(${i}, 'price', this)" class="w-full text-right bg-transparent text-blue-700 border border-slate-300 rounded p-1 text-xs font-mono font-bold outline-none focus:ring-1 focus:ring-blue-500">`;
-    tbody.innerHTML += `<tr class="hover:bg-slate-50 border-b border-slate-100 transition-colors"><td class="p-2 text-center font-bold text-slate-400">${i+1}</td><td class="p-2"><input type="text" value="${it.name}" oninput="window.updateItem(${i}, 'name', this)" class="w-full bg-transparent border border-slate-300 rounded p-1 text-xs outline-none focus:ring-1 focus:ring-blue-500"></td><td class="p-2"><input type="text" value="${it.unit}" oninput="window.updateItem(${i}, 'unit', this)" class="w-full text-center bg-transparent border border-slate-300 rounded p-1 text-xs outline-none focus:ring-1 focus:ring-blue-500"></td><td class="p-2"><input type="number" value="${it.qty}" oninput="window.updateItem(${i}, 'qty', this)" class="w-full text-right bg-transparent border border-slate-300 rounded p-1 text-xs outline-none focus:ring-1 focus:ring-blue-500"></td><td class="p-2">${priceInputHtml}</td><td class="p-2 text-right font-mono font-bold text-slate-700" id="rowTotal_${i}">${Math.round(it.qty*it.price).toLocaleString('vi-VN')}</td><td class="p-2 text-center"><button onclick="window.removeItemRow(${i})" class="text-rose-400 hover:text-rose-600 transition"><i class="fa-solid fa-xmark"></i></button></td></tr>`;
+    const totalVal = Math.round((it.qty || 0) * (it.price || 0));
+    
+    const priceInputHtml = isPriceReadOnly 
+        ? `<div class="relative w-full"><i class="fa-solid fa-lock absolute left-2 top-2 text-slate-400 text-[9px]"></i><input type="number" value="${it.price}" readonly class="w-full text-right pl-5 bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200 rounded p-1 text-xs font-mono"></div>` 
+        : `<input type="number" id="priceInput_${i}" value="${it.price}" oninput="window.updateItem(${i}, 'price', this)" class="w-full text-right bg-transparent text-blue-700 border border-slate-300 rounded p-1 text-xs font-mono font-bold outline-none focus:ring-1 focus:ring-blue-500">`;
+        
+    const totalInputHtml = isPriceReadOnly
+        ? `<div class="text-right font-mono font-bold text-slate-700">${totalVal.toLocaleString('vi-VN')}</div>`
+        : `<div class="flex items-center gap-1"><input type="number" id="totalInput_${i}" value="${totalVal}" oninput="window.updateItem(${i}, 'total', this)" class="w-full text-right bg-transparent text-rose-600 border border-slate-300 rounded p-1 text-xs font-mono font-bold outline-none focus:ring-1 focus:ring-rose-500"><button onclick="window.reverseCalc(${i})" title="Tính ngược từ giá có VAT" class="text-rose-500 hover:text-rose-700 px-1"><i class="fa-solid fa-calculator"></i></button></div>`;
+
+    tbody.innerHTML += `
+    <tr class="hover:bg-slate-50 border-b border-slate-100 transition-colors">
+        <td class="p-2 text-center font-bold text-slate-400 align-top pt-3">${i+1}</td>
+        <td class="p-2 align-top">
+            <textarea oninput="this.style.height=''; this.style.height=this.scrollHeight+'px'; window.updateItem(${i}, 'name', this)" class="w-full bg-transparent border border-slate-300 rounded p-1 text-xs outline-none focus:ring-1 focus:ring-blue-500 resize-none overflow-hidden min-h-[32px] whitespace-pre-wrap leading-tight block">${it.name}</textarea>
+        </td>
+        <td class="p-2 align-top pt-2"><input type="text" value="${it.unit}" oninput="window.updateItem(${i}, 'unit', this)" class="w-full text-center bg-transparent border border-slate-300 rounded p-1 text-xs outline-none focus:ring-1 focus:ring-blue-500"></td>
+        <td class="p-2 align-top pt-2"><input type="number" id="qtyInput_${i}" value="${it.qty}" oninput="window.updateItem(${i}, 'qty', this)" class="w-full text-right bg-transparent border border-slate-300 rounded p-1 text-xs outline-none focus:ring-1 focus:ring-blue-500"></td>
+        <td class="p-2 align-top pt-2">${priceInputHtml}</td>
+        <td class="p-2 align-top pt-2">${totalInputHtml}</td>
+        <td class="p-2 text-center align-top pt-3"><button onclick="window.removeItemRow(${i})" class="text-rose-400 hover:text-rose-600 transition"><i class="fa-solid fa-xmark"></i></button></td>
+    </tr>`;
   });
+  
+  // Tự động kéo dãn textarea khi vừa load xong
+  setTimeout(() => {
+    document.querySelectorAll('#itemsTableBody textarea').forEach(el => {
+        el.style.height = 'auto';
+        el.style.height = el.scrollHeight + 'px';
+    });
+  }, 10);
+  
   window.renderDocPreview();
 };
 
-window.updateItem = (i, f, el) => { window.itemsList[i][f] = (f==='qty'||f==='price') ? parseFloat(el.value)||0 : el.value; if(f === 'qty' || f === 'price') { const rowTotalEl = document.getElementById(`rowTotal_${i}`); if(rowTotalEl) rowTotalEl.innerText = Math.round(window.itemsList[i].qty * window.itemsList[i].price).toLocaleString('vi-VN'); } window.renderDocPreview(); };
+// ĐÃ NÂNG CẤP: Xử lý tính toán 2 chiều (Sửa Giá -> ra Tiền / Sửa Tiền -> ra Giá)
+window.updateItem = (i, f, el) => { 
+    if (f === 'total') {
+        const newTotal = parseFloat(el.value) || 0;
+        const qty = window.itemsList[i].qty || 1;
+        window.itemsList[i].price = newTotal / qty;
+        const priceEl = document.getElementById(`priceInput_${i}`);
+        if(priceEl) priceEl.value = window.itemsList[i].price;
+    } else {
+        window.itemsList[i][f] = (f==='qty'||f==='price') ? parseFloat(el.value)||0 : el.value; 
+        if(f === 'qty' || f === 'price') { 
+            const totalEl = document.getElementById(`totalInput_${i}`); 
+            if(totalEl) totalEl.value = Math.round(window.itemsList[i].qty * window.itemsList[i].price); 
+        } 
+    }
+    window.renderDocPreview(); 
+};
+
+// ĐÃ NÂNG CẤP: Nút Máy tính ma thuật (Bóc tách VAT ngược)
+window.reverseCalc = (i) => {
+    const vatEl = document.getElementById('vatSelect');
+    const vat = vatEl ? parseFloat(vatEl.value) : 0;
+    if(vat <= 0) {
+        if(window.showToast) window.showToast("Chức năng này dùng khi có Thuế VAT. Vui lòng chọn VAT trước!", "info");
+        return;
+    }
+    const postTaxTotalStr = prompt(`Nhập TỔNG TIỀN KHÁCH TRẢ (Đã bao gồm ${vat}% VAT) cho mặt hàng này:`);
+    if(!postTaxTotalStr) return;
+    
+    const postTaxTotal = parseFloat(postTaxTotalStr.replace(/[^\d]/g, ''));
+    if(isNaN(postTaxTotal) || postTaxTotal <= 0) return;
+
+    const preTaxTotal = postTaxTotal / (1 + vat / 100);
+    const qty = window.itemsList[i].qty || 1;
+    window.itemsList[i].price = preTaxTotal / qty;
+
+    window.renderItemsTable(); 
+    if(window.showToast) window.showToast("Đã bóc tách VAT và tính ngược đơn giá thành công!", "success");
+};
+
 window.addItemRow = () => { window.itemsList.push({name:"", unit:"Cái", qty:1, price:0}); window.renderItemsTable(); };
 window.removeItemRow = (i) => { window.itemsList.splice(i, 1); window.renderItemsTable(); };
 window.handleDepositAmountTyping = (el) => { const val = parseInt(el.value.replace(/[^\d]/g, ''))||0; el.value = val.toLocaleString('vi-VN'); window.renderDocPreview(); };
@@ -323,7 +392,7 @@ function docTienBangChu(amount) {
   result = result.trim().replace(/\s+/g, ' '); return result.charAt(0).toUpperCase() + result.slice(1) + " đồng chẵn.";
 }
 
-// BẢN VẼ A4 CHỐT HẠ - CÓ ĐỔI CHỮ CỌC THEO TỪNG TAB
+// BẢN VẼ A4 CHỐT HẠ - CÓ ĐỔI CHỮ CỌC THEO TỪNG TAB VÀ HỖ TRỢ XUỐNG DÒNG
 window.renderDocPreview = function() {
   const pDoc = document.getElementById('printDocument'); if(!pDoc) return;
   let subtotal = 0; window.itemsList.forEach(it => subtotal += (it.qty*it.price));
@@ -364,14 +433,15 @@ window.renderDocPreview = function() {
 
   let tbodyStr = '';
   window.itemsList.forEach((it, i) => {
-    if(hidePrice) { tbodyStr += `<tr><td style="border:1px solid #000;text-align:center;padding:${cellP}">${i+1}</td><td style="border:1px solid #000;padding:${cellP}"><strong>${it.name}</strong></td><td style="border:1px solid #000;text-align:center;padding:${cellP}">${it.unit}</td><td style="border:1px solid #000;text-align:center;padding:${cellP}">${it.qty.toLocaleString('vi-VN')}</td>${isA6 ? '' : `<td style="border:1px solid #000;padding:${cellP}"></td>`}</tr>`; }
-    else { tbodyStr += `<tr><td style="border:1px solid #000;text-align:center;padding:${cellP}">${i+1}</td><td style="border:1px solid #000;padding:${cellP}"><strong>${it.name}</strong></td><td style="border:1px solid #000;text-align:center;padding:${cellP}">${it.unit}</td><td style="border:1px solid #000;text-align:center;padding:${cellP}">${it.qty.toLocaleString('vi-VN')}</td><td style="border:1px solid #000;text-align:right;padding:${cellP}">${it.price.toLocaleString('vi-VN')}</td><td style="border:1px solid #000;text-align:right;font-weight:bold;padding:${cellP}">${Math.round(it.qty*it.price).toLocaleString('vi-VN')}</td></tr>`; }
+    // Biến đổi dấu xuống dòng thành thẻ <br> để in ra giấy
+    const formattedName = (it.name || '').replace(/\n/g, '<br>');
+    if(hidePrice) { tbodyStr += `<tr><td style="border:1px solid #000;text-align:center;padding:${cellP};vertical-align:top;">${i+1}</td><td style="border:1px solid #000;padding:${cellP};vertical-align:top;"><strong>${formattedName}</strong></td><td style="border:1px solid #000;text-align:center;padding:${cellP};vertical-align:top;">${it.unit}</td><td style="border:1px solid #000;text-align:center;padding:${cellP};vertical-align:top;">${it.qty.toLocaleString('vi-VN')}</td>${isA6 ? '' : `<td style="border:1px solid #000;padding:${cellP}"></td>`}</tr>`; }
+    else { tbodyStr += `<tr><td style="border:1px solid #000;text-align:center;padding:${cellP};vertical-align:top;">${i+1}</td><td style="border:1px solid #000;padding:${cellP};vertical-align:top;"><strong>${formattedName}</strong></td><td style="border:1px solid #000;text-align:center;padding:${cellP};vertical-align:top;">${it.unit}</td><td style="border:1px solid #000;text-align:center;padding:${cellP};vertical-align:top;">${it.qty.toLocaleString('vi-VN')}</td><td style="border:1px solid #000;text-align:right;padding:${cellP};vertical-align:top;">${it.price.toLocaleString('vi-VN')}</td><td style="border:1px solid #000;text-align:right;font-weight:bold;padding:${cellP};vertical-align:top;">${Math.round(it.qty*it.price).toLocaleString('vi-VN')}</td></tr>`; }
   });
   
   const tEl = document.getElementById('docTerms');
   const termsText = tEl ? tEl.value.trim() : ''; const termsHtml = termsText ? `<div style="margin-bottom:15px; white-space: pre-wrap; font-size:${isA6?'9px':(isA5?'11px':'13px')};"><strong>Ghi chú:</strong><br>${termsText}</div>` : '';
   
-  // LOGIC HIỂN THỊ CHỮ CỌC THEO TAB NHƯ ANH YÊU CẦU
   let lblDeposit = window.activeDocMode === 'quote' ? 'Đề nghị đặt cọc:' : (window.activeDocMode === 'delivery' ? 'Đã thanh toán (Cọc):' : 'Đã thanh toán / Đặt cọc:');
   let lblRemain = window.activeDocMode === 'delivery' ? 'CẦN THU THÊM:' : 'Còn lại:';
 
@@ -416,7 +486,6 @@ window.renderDocPreview = function() {
     </div>`;
 };
 
-// ĐÃ SỬA: Thêm cấu hình chống dư trang PDF
 window.exportToPdf = async function() {
   const pSize = window.activeDocMode === 'delivery' ? window.deliveryPaperSize : (window.activeDocMode === 'order' && window.deliveryPaperSize ? window.deliveryPaperSize : 'A4');
   let format = 'a4'; let orientation = 'portrait';
@@ -444,12 +513,10 @@ window.exportToPdf = async function() {
   }
 };
 
-// TÍNH NĂNG MỚI: XUẤT RA FILE ẢNH (.JPG)
 window.exportToImage = async function() {
   const printDoc = document.getElementById('printDocument');
   if (!printDoc) return;
   
-  // Tạm thời bỏ giới hạn chiều cao để chụp đủ hình nếu nội dung dài
   const oldOverflow = printDoc.style.overflow;
   printDoc.style.overflow = 'visible';
   
@@ -473,7 +540,7 @@ window.exportToImage = async function() {
     console.error("Lỗi xuất ảnh:", error);
     if(window.showToast) window.showToast("Lỗi khi xuất ảnh!", "error");
   } finally {
-    printDoc.style.overflow = oldOverflow; // Trả lại style cũ
+    printDoc.style.overflow = oldOverflow; 
     if(btn) btn.innerHTML = btn.dataset.originalText;
   }
 };
