@@ -10,7 +10,7 @@ window.isCompanyEditing = false;
 window.currentOrderId = null;
 window.currentOrderDate = null;
 window.orderDates = null;
-window.aiAttachedImage = null; // Biến lưu trữ ảnh đính kèm cho AI
+window.aiAttachedImage = null;
 
 window.tabNotes = { 
   quote: "- Báo giá có giá trị trong vòng 15 ngày.\n- Giá trên chưa bao gồm 8% thuế GTGT.\n- Miễn phí giao hàng nội thành TP.HCM.", 
@@ -21,7 +21,6 @@ window.tabItems = { quote: null, order: null, delivery: null };
 window.tabItems['quote'] = [ { name: "In tem nhãn Decal giấy (Bế đờ mi, cán màng bóng)", unit: "Tem", qty: 5000, price: 350 }, { name: "In hộp giấy Kraft bế dán thành phẩm", unit: "Hộp", qty: 1000, price: 4500 }, { name: "Thiết kế file in (Miễn phí theo đơn)", unit: "Gói", qty: 1, price: 0 } ];
 window.itemsList = JSON.parse(JSON.stringify(window.tabItems['quote']));
 
-// KHỞI ĐỘNG HỆ THỐNG & TÍNH NĂNG DÁN ẢNH CHO AI
 document.addEventListener("DOMContentLoaded", async () => {
   console.log("DocuGen Pro đang khởi động...");
   
@@ -39,7 +38,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   `;
   document.head.appendChild(mStyle);
 
-  // LẮNG NGHE SỰ KIỆN DÁN (PASTE) ĐỂ BẮT HÌNH ẢNH CHO AI
   document.addEventListener('paste', (e) => {
     if (window.activeDocMode !== 'quote') return;
     const items = (e.clipboardData || e.originalEvent.clipboardData).items;
@@ -89,14 +87,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 });
 
-// Xóa ảnh đã đính kèm
 window.removeAiImage = () => {
     window.aiAttachedImage = null;
     const container = document.getElementById('aiImagePreviewContainer');
     if(container) container.classList.add('hidden');
 };
 
-// HÀM AI ĐÃ CHUYỂN SANG DÙNG TRẠM TRUNG CHUYỂN
 window.processAI = async () => {
   if (window.activeDocMode !== 'quote') { 
       window.showToast("AI chỉ hỗ trợ phân tích khi đang lập Báo giá mới!", "error"); return; 
@@ -104,51 +100,35 @@ window.processAI = async () => {
   
   const promptText = document.getElementById('aiPromptInput').value.trim(); 
   const statusMsg = document.getElementById('aiStatusMsg');
-  
-  // DÁN CÁI LINK WEB APP (SCRIPT.GOOGLE.COM) MÀ ANH VỪA LẤY ĐƯỢC VÀO ĐÂY:
   const scriptUrl = "https://script.google.com/macros/s/AKfycbzcahuGuwKYRLTrKA7IrbJp1UCW2Z4RAVqFkWhkF5Z1Bwtol6-ymN-qGrDbD0giT6Pc/exec"; 
   
   if(!promptText && !window.aiAttachedImage) { 
       window.showToast("Anh nhập nội dung hoặc dán ảnh (Ctrl+V) vô trước đã nghen!", "error"); return; 
   }
-  if(!scriptUrl || scriptUrl === "DÁN_LINK_WEB_APP_CỦA_ANH_VÀO_ĐÂY") { 
-      statusMsg.innerHTML = '<span class="text-rose-600 font-bold">Anh chưa chèn Link Trạm trung chuyển vào code!</span>'; return; 
-  }
   
   statusMsg.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang gửi dữ liệu qua Trạm AI xử lý...';
   
   try {
-    const payload = {
-        promptText: promptText,
-        attachedImage: window.aiAttachedImage
-    };
-
-    // Đẩy dữ liệu qua trạm trung chuyển Apps Script
+    const payload = { promptText: promptText, attachedImage: window.aiAttachedImage };
     const response = await fetch(scriptUrl, {
       method: 'POST',
-      // Dùng text/plain để bypass lỗi chặn chéo nguồn (CORS) của trình duyệt
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify(payload)
     });
 
     const data = await response.json();
-
     if (data.error) throw new Error(data.error);
     if (!data.success || !data.data) throw new Error("Dữ liệu trả về bị lỗi");
 
     const result = data.data;
 
-    // Rải dữ liệu JSON lên màn hình
     if(result.custName) document.getElementById('custName').value = result.custName.toUpperCase();
     if(result.custPhone) document.getElementById('custPhone').value = result.custPhone;
     if(result.deliveryAddress) document.getElementById('deliveryAddress').value = result.deliveryAddress;
     
     if(result.items && Array.isArray(result.items) && result.items.length > 0) {
         window.itemsList = result.items.map(item => ({
-            name: item.name || "Hàng in",
-            unit: item.unit || "Cái",
-            qty: Number(item.qty) || 1,
-            price: 0 
+            name: item.name || "Hàng in", unit: item.unit || "Cái", qty: Number(item.qty) || 1, price: 0 
         }));
         window.renderItemsTable();
     }
@@ -156,7 +136,6 @@ window.processAI = async () => {
     statusMsg.innerHTML = '<span class="text-emerald-600 font-bold">Đã phân tích xong! Anh điền thêm đơn giá nhé.</span>';
     window.showToast("AI nhập liệu thành công", "success");
     window.renderDocPreview();
-    
     window.removeAiImage();
     
   } catch (error) {
@@ -363,6 +342,7 @@ function docTienBangChu(amount) {
   return result.trim().replace(/\s+/g, ' ').replace(/^./, c => c.toUpperCase()) + " đồng chẵn.";
 }
 
+// HÀM RENDER ĐÃ ĐƯỢC BỌC THÉP CHỐNG LỖI TRẮNG TRANG
 window.renderDocPreview = function() {
   const pDoc = document.getElementById('printDocument'); if(!pDoc) return;
   let subtotal = 0; window.itemsList.forEach(it => subtotal += ((parseFloat(it.qty)||0) * (parseFloat(it.price)||0))); subtotal = Math.round(subtotal); 
@@ -385,8 +365,17 @@ window.renderDocPreview = function() {
   ['custTaxId','custCompanyPhone','custEmail'].forEach(id => { const el = document.getElementById(id); const val = el ? el.value.trim() : ''; if(val) taxLines.push(id==='custTaxId'?`<strong>MST:</strong> ${val}`:id==='custCompanyPhone'?`<strong>SĐT:</strong> ${val}`:`<strong>Email:</strong> ${val}`); });
   
   const getVal = (id, def) => { const el = document.getElementById(id); return el ? el.value : def; };
-  const sName = getVal('sellerName', window.DEFAULT_COMPANY.name); const sAdd = getVal('sellerAddress', window.DEFAULT_COMPANY.address); const sBranch = getVal('sellerBranch', window.DEFAULT_COMPANY.branch); const sHotline = getVal('sellerPhone', window.DEFAULT_COMPANY.phone); const sTax = getVal('sellerTaxCode', window.DEFAULT_COMPANY.taxCode);
-  const creatorName = getVal('docCreatorInput', window.currentAppFullName); const dTitleSel = document.getElementById('deliveryTitleSelect');
+  
+  // PHAO CỨU SINH BẢO VỆ CHỐNG SẬP ẨN DANH
+  const defComp = window.DEFAULT_COMPANY || { name: "CÔNG TY TNHH PHẠM DUY KHANG", address: "860/84A Xô Viết Nghệ Tĩnh, Phường Thạnh Mỹ Tây, TP. Hồ Chí Minh", branch: "A34/9JS Quốc Lộ 50, Phường Bình Hưng, TP. HCM", phone: "0986.450.025", taxCode: "0310085652" };
+  const sName = getVal('sellerName', defComp.name); 
+  const sAdd = getVal('sellerAddress', defComp.address); 
+  const sBranch = getVal('sellerBranch', defComp.branch); 
+  const sHotline = getVal('sellerPhone', defComp.phone); 
+  const sTax = getVal('sellerTaxCode', defComp.taxCode);
+  const creatorName = getVal('docCreatorInput', window.currentAppFullName || 'Phạm Đăng Duy'); 
+  
+  const dTitleSel = document.getElementById('deliveryTitleSelect');
   let title = window.activeDocMode === 'quote' ? 'BẢNG BÁO GIÁ' : (window.activeDocMode === 'order' ? 'ĐƠN ĐẶT HÀNG' : (dTitleSel?dTitleSel.value:'PHIẾU GIAO HÀNG'));
   
   const dpCheck = document.getElementById('deliveryShowPriceCheckbox'); const hidePrice = (window.activeDocMode === 'delivery' && dpCheck && !dpCheck.checked) || pSize === 'A6-portrait'; const isNoSum = (window.activeDocMode === 'quote' && window.quoteSumMode === 'options');
