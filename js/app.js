@@ -1,6 +1,6 @@
 // ==========================================
 // DOCUGEN PRO - GIAO DIỆN & XỬ LÝ CHÍNH (APP.JS)
-// BẢN CHỐT HẠ: SẠCH LỖI SYNTAX, TÍCH HỢP APPS SCRIPT
+// BẢN TỐC ĐỘ CAO - ĐỌC API KEY TỪ CÀI ĐẶT BỘ NHỚ
 // ==========================================
 
 window.activeDocMode = 'quote';
@@ -102,14 +102,14 @@ window.processAI = async () => {
   const promptText = document.getElementById('aiPromptInput').value.trim(); 
   const statusMsg = document.getElementById('aiStatusMsg');
   
-  // GẮN TRỰC TIẾP API KEY VÀO ĐÂY ĐỂ ĐẠT TỐC ĐỘ TỐI ĐA
-  const apiKey = "AQ.Ab8RN6LDQV7hYSfyIT7JPXIXwVUnKH0i5WAyujYrJL6dHAho-g"; 
+  // LẤY API KEY TỪ CÀI ĐẶT TRÌNH DUYỆT (LOCAL STORAGE)
+  const apiKey = window.SafeStore.get('docugen_cfg_ai'); 
   
   if(!promptText && !window.aiAttachedImage) { 
       window.showToast("Anh nhập nội dung hoặc dán ảnh (Ctrl+V) vô trước đã nghen!", "error"); return; 
   }
-  if(!apiKey || apiKey === "ĐIỀN_API_KEY_CỦA_ANH_VÀO_ĐÂY") { 
-      statusMsg.innerHTML = '<span class="text-rose-600 font-bold">Anh chưa chèn API Key vào code!</span>'; return; 
+  if(!apiKey) { 
+      statusMsg.innerHTML = '<span class="text-rose-600 font-bold">Chưa có API Key! Anh bấm vào Cài đặt (bánh răng) để nhập mã nhé.</span>'; return; 
   }
   
   statusMsg.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang nhờ Gemini 3.8 Flash đọc siêu tốc...';
@@ -368,7 +368,6 @@ function docTienBangChu(amount) {
   return result.trim().replace(/\s+/g, ' ').replace(/^./, c => c.toUpperCase()) + " đồng chẵn.";
 }
 
-// HÀM RENDER ĐÃ ĐƯỢC CHỐT HẠ GỌN GÀNG, SẠCH SẼ NHẤT
 window.renderDocPreview = function() {
   const pDoc = document.getElementById('printDocument'); if(!pDoc) return;
   let subtotal = 0; window.itemsList.forEach(it => subtotal += ((parseFloat(it.qty)||0) * (parseFloat(it.price)||0))); subtotal = Math.round(subtotal); 
@@ -381,10 +380,8 @@ window.renderDocPreview = function() {
   setHtml('displaySubtotal', subtotal.toLocaleString('vi-VN') + ' đ'); setHtml('displayVatAmount', vatAmount.toLocaleString('vi-VN') + ' đ'); setHtml('displayGrandTotal', grandTotal.toLocaleString('vi-VN') + ' đ'); setHtml('displayDepositAmount', depAmount.toLocaleString('vi-VN') + ' đ'); setHtml('displayRemainingAmount', remain.toLocaleString('vi-VN') + ' đ');
   
   let amountToSpell = grandTotal; if (window.activeDocMode === 'order' || window.activeDocMode === 'delivery') amountToSpell = remain;
-  
   const totalWords = docTienBangChu(amountToSpell);
-  setHtml('displayAmountWords', totalWords); 
-  setHtml('displayDepositWords', docTienBangChu(depAmount));
+  setHtml('displayAmountWords', totalWords); setHtml('displayDepositWords', docTienBangChu(depAmount));
 
   const pSize = window.activeDocMode === 'delivery' ? window.deliveryPaperSize : (window.activeDocMode === 'order' && window.deliveryPaperSize ? window.deliveryPaperSize : 'A4');
   const dps = document.getElementById('dynamicPagePrintStyle'); const ppsb = document.getElementById('previewPaperSizeBadge');
@@ -394,15 +391,9 @@ window.renderDocPreview = function() {
   ['custTaxId','custCompanyPhone','custEmail'].forEach(id => { const el = document.getElementById(id); const val = el ? el.value.trim() : ''; if(val) taxLines.push(id==='custTaxId'?`<strong>MST:</strong> ${val}`:id==='custCompanyPhone'?`<strong>SĐT:</strong> ${val}`:`<strong>Email:</strong> ${val}`); });
   
   const getVal = (id, def) => { const el = document.getElementById(id); return el ? el.value : def; };
-  
   const defComp = window.DEFAULT_COMPANY || { name: "CÔNG TY TNHH PHẠM DUY KHANG", address: "860/84A Xô Viết Nghệ Tĩnh, Phường Thạnh Mỹ Tây, TP. Hồ Chí Minh", branch: "A34/9JS Quốc Lộ 50, Phường Bình Hưng, TP. HCM", phone: "0986.450.025", taxCode: "0310085652" };
-  const sName = getVal('sellerName', defComp.name); 
-  const sAdd = getVal('sellerAddress', defComp.address); 
-  const sBranch = getVal('sellerBranch', defComp.branch); 
-  const sHotline = getVal('sellerPhone', defComp.phone); 
-  const sTax = getVal('sellerTaxCode', defComp.taxCode);
+  const sName = getVal('sellerName', defComp.name); const sAdd = getVal('sellerAddress', defComp.address); const sBranch = getVal('sellerBranch', defComp.branch); const sHotline = getVal('sellerPhone', defComp.phone); const sTax = getVal('sellerTaxCode', defComp.taxCode);
   const creatorName = getVal('docCreatorInput', window.currentAppFullName || 'Phạm Đăng Duy'); 
-  
   const dTitleSel = document.getElementById('deliveryTitleSelect');
   let title = window.activeDocMode === 'quote' ? 'BẢNG BÁO GIÁ' : (window.activeDocMode === 'order' ? 'ĐƠN ĐẶT HÀNG' : (dTitleSel?dTitleSel.value:'PHIẾU GIAO HÀNG'));
   
