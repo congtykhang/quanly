@@ -101,27 +101,52 @@ window.processAI = async () => {
   
   const promptText = document.getElementById('aiPromptInput').value.trim(); 
   const statusMsg = document.getElementById('aiStatusMsg');
-  const scriptUrl = "https://script.google.com/macros/s/AKfycbzcahuGuwKYRLTrKA7IrbJp1UCW2Z4RAVqFkWhkF5Z1Bwtol6-ymN-qGrDbD0giT6Pc/exec"; 
+  
+  // GẮN TRỰC TIẾP API KEY VÀO ĐÂY ĐỂ ĐẠT TỐC ĐỘ TỐI ĐA
+  const apiKey = "AQ.Ab8RN6LDQV7hYSfyIT7JPXIXwVUnKH0i5WAyujYrJL6dHAho-g"; 
   
   if(!promptText && !window.aiAttachedImage) { 
       window.showToast("Anh nhập nội dung hoặc dán ảnh (Ctrl+V) vô trước đã nghen!", "error"); return; 
   }
+  if(!apiKey || apiKey === "ĐIỀN_API_KEY_CỦA_ANH_VÀO_ĐÂY") { 
+      statusMsg.innerHTML = '<span class="text-rose-600 font-bold">Anh chưa chèn API Key vào code!</span>'; return; 
+  }
   
-  statusMsg.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang gửi dữ liệu qua Trạm AI xử lý...';
+  statusMsg.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang nhờ Gemini 3.8 Flash đọc siêu tốc...';
   
   try {
-    const payload = { promptText: promptText, attachedImage: window.aiAttachedImage };
-    const response = await fetch(scriptUrl, {
+    const aiPrompt = `Đọc tin nhắn văn bản và/hoặc hình ảnh đính kèm (ảnh chụp màn hình Zalo, mẫu in...) sau đây để trích xuất thành định dạng JSON thuần túy (không kèm markdown, không giải thích).
+    Cấu trúc JSON bắt buộc:
+    {
+      "custName": "Tên KH hoặc công ty (nếu có)",
+      "custPhone": "SĐT (nếu có)",
+      "deliveryAddress": "Địa chỉ giao hàng (nếu có)",
+      "items": [
+        { "name": "Tên hàng & quy cách chi tiết", "unit": "Cái/Hộp...", "qty": số_lượng_chỉ_ghi_số_nguyên }
+      ]
+    }
+    Nội dung text bổ sung: "${promptText}"`;
+
+    const parts = [{ text: aiPrompt }];
+    if (window.aiAttachedImage) {
+        parts.push(window.aiAttachedImage);
+    }
+
+    // GỌI THẲNG API KHÔNG QUA TRUNG GIAN
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(payload)
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: parts }]
+      })
     });
 
     const data = await response.json();
-    if (data.error) throw new Error(data.error);
-    if (!data.success || !data.data) throw new Error("Dữ liệu trả về bị lỗi");
+    if (!response.ok) throw new Error(data.error?.message || "Lỗi kết nối API với Google");
 
-    const result = data.data;
+    let rawJsonStr = data.candidates[0].content.parts[0].text;
+    rawJsonStr = rawJsonStr.replace(/```json/gi, '').replace(/```/g, '').trim();
+    const result = JSON.parse(rawJsonStr);
 
     if(result.custName) document.getElementById('custName').value = result.custName.toUpperCase();
     if(result.custPhone) document.getElementById('custPhone').value = result.custPhone;
@@ -140,7 +165,7 @@ window.processAI = async () => {
     window.removeAiImage();
     
   } catch (error) {
-    console.error("Lỗi trạm trung chuyển AI:", error);
+    console.error("Lỗi AI chi tiết:", error);
     statusMsg.innerHTML = `<span class="text-rose-600 font-bold">Lỗi: ${error.message}</span>`;
     window.showToast("Lỗi phân tích AI", "error");
   }
