@@ -1,5 +1,6 @@
 // ==========================================
 // DOCUGEN PRO - GIAO DIỆN & XỬ LÝ CHÍNH (APP.JS)
+// BẢN CHỐT HẠ: SẠCH LỖI SYNTAX, TÍCH HỢP APPS SCRIPT
 // ==========================================
 
 window.activeDocMode = 'quote';
@@ -342,8 +343,7 @@ function docTienBangChu(amount) {
   return result.trim().replace(/\s+/g, ' ').replace(/^./, c => c.toUpperCase()) + " đồng chẵn.";
 }
 
-// HÀM RENDER ĐÃ ĐƯỢC BỌC THÉP CHỐNG LỖI TRẮNG TRANG
-// BẢN VÁ LỖI TRẮNG TRANG VÀ LỖI totalWords
+// HÀM RENDER ĐÃ ĐƯỢC CHỐT HẠ GỌN GÀNG, SẠCH SẼ NHẤT
 window.renderDocPreview = function() {
   const pDoc = document.getElementById('printDocument'); if(!pDoc) return;
   let subtotal = 0; window.itemsList.forEach(it => subtotal += ((parseFloat(it.qty)||0) * (parseFloat(it.price)||0))); subtotal = Math.round(subtotal); 
@@ -357,10 +357,9 @@ window.renderDocPreview = function() {
   
   let amountToSpell = grandTotal; if (window.activeDocMode === 'order' || window.activeDocMode === 'delivery') amountToSpell = remain;
   
-  // ĐÃ KHÔI PHỤC LẠI BIẾN NÀY ĐỂ KHÔNG BỊ SẬP TRANG
   const totalWords = docTienBangChu(amountToSpell);
-  
-  setHtml('displayAmountWords', totalWords); setHtml('displayDepositWords', docTienBangChu(depAmount));
+  setHtml('displayAmountWords', totalWords); 
+  setHtml('displayDepositWords', docTienBangChu(depAmount));
 
   const pSize = window.activeDocMode === 'delivery' ? window.deliveryPaperSize : (window.activeDocMode === 'order' && window.deliveryPaperSize ? window.deliveryPaperSize : 'A4');
   const dps = document.getElementById('dynamicPagePrintStyle'); const ppsb = document.getElementById('previewPaperSizeBadge');
@@ -371,68 +370,6 @@ window.renderDocPreview = function() {
   
   const getVal = (id, def) => { const el = document.getElementById(id); return el ? el.value : def; };
   
-  const defComp = window.DEFAULT_COMPANY || { name: "CÔNG TY TNHH PHẠM DUY KHANG", address: "860/84A Xô Viết Nghệ Tĩnh, Phường Thạnh Mỹ Tây, TP. Hồ Chí Minh", branch: "A34/9JS Quốc Lộ 50, Phường Bình Hưng, TP. HCM", phone: "0986.450.025", taxCode: "0310085652" };
-  const sName = getVal('sellerName', defComp.name); 
-  const sAdd = getVal('sellerAddress', defComp.address); 
-  const sBranch = getVal('sellerBranch', defComp.branch); 
-  const sHotline = getVal('sellerPhone', defComp.phone); 
-  const sTax = getVal('sellerTaxCode', defComp.taxCode);
-  const creatorName = getVal('docCreatorInput', window.currentAppFullName || 'Phạm Đăng Duy'); 
-  
-  const dTitleSel = document.getElementById('deliveryTitleSelect');
-  let title = window.activeDocMode === 'quote' ? 'BẢNG BÁO GIÁ' : (window.activeDocMode === 'order' ? 'ĐƠN ĐẶT HÀNG' : (dTitleSel?dTitleSel.value:'PHIẾU GIAO HÀNG'));
-  
-  const dpCheck = document.getElementById('deliveryShowPriceCheckbox'); const hidePrice = (window.activeDocMode === 'delivery' && dpCheck && !dpCheck.checked) || pSize === 'A6-portrait'; const isNoSum = (window.activeDocMode === 'quote' && window.quoteSumMode === 'options');
-  const isA6 = pSize === 'A6-portrait'; const isA5P = pSize === 'A5-portrait'; const isA5 = pSize !== 'A4' && !isA6;
-  const fontT = isA6 ? '14px' : (isA5P ? '16px' : (isA5 ? '18px' : '21px')); const fontBase = isA6 ? '9px' : (isA5P ? '10.5px' : (isA5 ? '12px' : '13.5px')); const cellP = isA6 ? '2px 3px' : (isA5P ? '3px 4px' : '6px 8px');
-
-  let tbodyStr = '';
-  window.itemsList.forEach((it, i) => {
-    const formattedName = (it.name || '').replace(/\n/g, '<br>'); const displayPrice = Number(it.price).toLocaleString('vi-VN', { maximumFractionDigits: 2 }); const displayRowTotal = Math.round((parseFloat(it.qty)||0) * (parseFloat(it.price)||0)).toLocaleString('vi-VN');
-    if(hidePrice) { tbodyStr += `<tr><td style="border:1px solid #000;text-align:center;padding:${cellP};vertical-align:top;">${i+1}</td><td style="border:1px solid #000;padding:${cellP};vertical-align:top;"><strong>${formattedName}</strong></td><td style="border:1px solid #000;text-align:center;padding:${cellP};vertical-align:top;">${it.unit}</td><td style="border:1px solid #000;text-align:center;padding:${cellP};vertical-align:top;">${it.qty.toLocaleString('vi-VN')}</td>${isA6 ? '' : `<td style="border:1px solid #000;padding:${cellP}"></td>`}</tr>`; }
-    else { tbodyStr += `<tr><td style="border:1px solid #000;text-align:center;padding:${cellP};vertical-align:top;">${i+1}</td><td style="border:1px solid #000;padding:${cellP};vertical-align:top;"><strong>${formattedName}</strong></td><td style="border:1px solid #000;text-align:center;padding:${cellP};vertical-align:top;">${it.unit}</td><td style="border:1px solid #000;text-align:center;padding:${cellP};vertical-align:top;">${it.qty.toLocaleString('vi-VN')}</td><td style="border:1px solid #000;text-align:right;padding:${cellP};vertical-align:top;">${displayPrice}</td><td style="border:1px solid #000;text-align:right;font-weight:bold;padding:${cellP};vertical-align:top;">${displayRowTotal}</td></tr>`; }
-  });
-  
-  const tEl = document.getElementById('docTerms'); const termsText = tEl ? tEl.value.trim() : ''; const termsHtml = termsText ? `<div style="margin-bottom:15px; white-space: pre-wrap; font-size:${isA6?'9px':(isA5?'11px':'13px')};"><strong>Ghi chú:</strong><br>${termsText}</div>` : '';
-  let lblDeposit = window.activeDocMode === 'quote' ? 'Đề nghị đặt cọc:' : (window.activeDocMode === 'delivery' ? 'Đã thanh toán (Cọc):' : 'Đã thanh toán / Đặt cọc:');
-  let lblRemain = window.activeDocMode === 'delivery' ? 'CẦN THU THÊM:' : 'Còn lại:';
-
-  if(!hidePrice && !isNoSum && !isA6) {
-    if(vatVal > 0) tbodyStr += `<tr><td colspan="5" style="border:1px solid #000;text-align:right;font-weight:bold;padding:${cellP}">Cộng tiền hàng:</td><td style="border:1px solid #000;text-align:right;font-weight:bold;padding:${cellP}">${subtotal.toLocaleString('vi-VN')}</td></tr><tr><td colspan="5" style="border:1px solid #000;text-align:right;font-weight:bold;padding:${cellP}">Thuế VAT (${vatVal}%):</td><td style="border:1px solid #000;text-align:right;font-weight:bold;padding:${cellP}">${vatAmount.toLocaleString('vi-VN')}</td></tr>`;
-    tbodyStr += `<tr><td colspan="5" style="border:1px solid #000;text-align:right;font-weight:bold;font-size:${isA5?'11px':'14px'};padding:${cellP};color:#b91c1c;">TỔNG CỘNG THANH TOÁN:</td><td style="border:1px solid #000;text-align:right;font-weight:bold;font-size:${isA5?'11px':'14px'};padding:${cellP};color:#b91c1c;">${grandTotal.toLocaleString('vi-VN')} đ</td></tr>`;
-    if(depAmount > 0) { tbodyStr += `<tr><td colspan="5" style="border:1px solid #000;text-align:right;font-weight:bold;padding:${cellP}">${lblDeposit}</td><td style="border:1px solid #000;text-align:right;font-weight:bold;color:#1e3a8a;padding:${cellP}">${depAmount.toLocaleString('vi-VN')} đ</td></tr><tr><td colspan="5" style="border:1px solid #000;text-align:right;font-weight:bold;padding:${cellP}">${lblRemain}</td><td style="border:1px solid #000;text-align:right;font-weight:bold;color:#b91c1c;padding:${cellP}">${remain.toLocaleString('vi-VN')} đ</td></tr>`; }
-  }
-  
-  let headerHtml = ''; const numInp = document.getElementById('docNumberInput'); const dateInp = document.getElementById('docDateInput'); const dNum = numInp ? numInp.value : ''; const dDate = dateInp ? dateInp.value : '';
-  if(isA6) { headerHtml = `<div style="border-bottom: 1px solid #1e3a8a; padding-bottom: 4px; margin-bottom: 6px; text-align:center;"><div style="font-size:10px; font-weight:bold; color:#1e3a8a;">${sName}</div><div style="font-size:8px;"><strong>Hotline:</strong> <span style="color:#b91c1c;font-weight:bold;">${sHotline}</span></div></div><table style="width:100%; font-size:8px; margin-bottom:4px;"><tr><td style="text-align:left;"><strong>Số:</strong> ${dNum}</td><td style="text-align:right;"><strong>Ngày:</strong> ${dDate}</td></tr></table>`; } 
-  else { headerHtml = `<div style="border-bottom: 2px solid #1e3a8a; padding-bottom: 8px; margin-bottom: 10px;"><table style="width:100%;"><tr><td style="width:70%;vertical-align:top;"><div style="font-size:${isA5P?'12px':'15px'}; font-weight:bold; color:#1e3a8a;">${sName}</div><div><strong>Địa chỉ:</strong> ${sAdd}</div>${sBranch ? `<div><strong>Chi nhánh:</strong> ${sBranch}</div>` : ''}<div><strong>Hotline:</strong> <span style="color:#b91c1c;font-weight:bold;">${sHotline}</span> | <strong>MST:</strong> ${sTax}</div></td><td style="width:30%;vertical-align:top;text-align:right;"><div style="border:1px solid #ccc; padding:4px; border-radius:4px; text-align:left; display:inline-block;"><div><strong>Số:</strong> ${dNum}</div><div><strong>Ngày:</strong> ${dDate}</div></div></td></tr></table></div>`; }
-  
-  pDoc.innerHTML = `
-    <div style="font-size:${fontBase}; line-height:1.4;">
-      ${headerHtml}
-      <h1 style="text-align:center; font-size:${fontT}; font-weight:bold; margin: ${isA6?'6px 0':'12px 0'};">${title}</h1>
-      <div style="border:1px solid #334155; padding:${isA6?'4px 6px':'6px 8px'}; margin-bottom:10px; background:#fcfcfc;">
-        <div style="display:flex; margin-bottom:2px;"><span style="font-weight:bold; width:${isA6?'60px':'100px'}; flex-shrink:0;">Khách hàng:</span> <strong style="color:#1e3a8a;">${cName}</strong></div>
-        ${taxLines.length > 0 && !isA6 ? `<div style="margin-bottom:2px;">${taxLines.join(' &nbsp;|&nbsp; ')}</div>` : ''}
-        ${!isA6 ? `<div style="display:flex; margin-bottom:2px;"><span style="font-weight:bold; width:100px; flex-shrink:0;">Địa chỉ:</span> <span>${getVal('custAddress','')}</span></div>` : ''}
-        <div style="display:flex; margin-bottom:2px;"><span style="font-weight:bold; width:${isA6?'60px':'100px'}; flex-shrink:0;">Liên hệ:</span> <span><strong style="color:#1e3a8a;">${getVal('contactPerson','')}</strong> &nbsp;|&nbsp; <strong>SĐT:</strong> <strong>${getVal('custPhone','')}</strong></span></div>
-        <div style="display:flex; margin-bottom:2px;"><span style="font-weight:bold; width:${isA6?'60px':'100px'}; flex-shrink:0;">Giao hàng:</span> <span>${getVal('deliveryAddress','')}</span></div>
-        ${isA6 && getVal('deliveryTime','') ? `<div style="display:flex; margin-bottom:2px;"><span style="font-weight:bold; width:60px; flex-shrink:0;">Thời gian:</span> <span>${getVal('deliveryTime','')}</span></div>` : ''}
-      </div>
-      <table style="width:100%; border-collapse:collapse; margin-bottom:10px;">
-        <thead style="background:#e2e8f0;">
-          ${hidePrice ? `<tr><th style="border:1px solid #000;padding:${cellP};width:6%">STT</th><th style="border:1px solid #000;padding:${cellP};width:${isA6?'60%':'54%'}">TÊN HÀNG & QUY CÁCH</th><th style="border:1px solid #000;padding:${cellP};width:10%">ĐVT</th><th style="border:1px solid #000;padding:${cellP};width:12\%">SL</th>${isA6 ? '' : `<th style="border:1px solid #000;padding:${cellP};width:18%">KIỂM ĐẾM</th>`}</tr>` : `<tr><th style="border:1px solid #000;padding:${cellP};width:5%">STT</th><th style="border:1px solid #000;padding:${cellP};width:43%">TÊN HÀNG & QUY CÁCH</th><th style="border:1px solid #000;padding:${cellP};width:8%">ĐVT</th><th style="border:1px solid #000;padding:${cellP};width:11%">SL</th><th style="border:1px solid #000;padding:${cellP};width:16%">ĐƠN GIÁ</th><th style="border:1px solid #000;padding:${cellP};width:17%">THÀNH TIỀN</th></tr>`}
-        </thead>
-        <tbody>${tbodyStr}</tbody>
-      </table>
-      ${(!hidePrice && !isNoSum && !isA6) ? `<div style="margin-bottom:15px;">• Số tiền bằng chữ: <strong>${totalWords}</strong></div>` : ''}
-      ${isNoSum && !isA6 ? `<div style="font-style:italic; margin-bottom:10px;">* Lưu ý: Bảng báo giá trên gồm các phương án lựa chọn độc lập.</div>` : ''}
-      ${!isA6 ? termsHtml : ''}
-      ${!isA6 ? `<table style="width:100%; text-align:center; margin-top:20px;"><tr>${window.activeDocMode === 'delivery' ? `<td style="width:33%;"><strong>NGƯỜI LẬP PHIẾU</strong><br><br><br><br><br><strong>${creatorName}</strong></td><td style="width:33%;"><strong>NGƯỜI GIAO HÀNG</strong><br><br><br><br><br></td><td style="width:34%;"><strong>NGƯỜI NHẬN HÀNG</strong><br><br><br><br><br></td>` : `<td style="width:50%;"><strong>XÁC NHẬN KHÁCH HÀNG</strong><br><br><br><br><br></td><td style="width:50%;"><strong>ĐẠI DIỆN</strong><br><strong>${sName.toUpperCase()}</strong><br><br><br><br><strong>${creatorName}</strong></td>`}</tr></table>` : `<div style="text-align:right; font-weight:bold; margin-top:10px;">Lập phiếu: ${creatorName}</div>`}
-    </div>`;
-};
-  
-  // PHAO CỨU SINH BẢO VỆ CHỐNG SẬP ẨN DANH
   const defComp = window.DEFAULT_COMPANY || { name: "CÔNG TY TNHH PHẠM DUY KHANG", address: "860/84A Xô Viết Nghệ Tĩnh, Phường Thạnh Mỹ Tây, TP. Hồ Chí Minh", branch: "A34/9JS Quốc Lộ 50, Phường Bình Hưng, TP. HCM", phone: "0986.450.025", taxCode: "0310085652" };
   const sName = getVal('sellerName', defComp.name); 
   const sAdd = getVal('sellerAddress', defComp.address); 
