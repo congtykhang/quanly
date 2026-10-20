@@ -106,7 +106,7 @@ window.processAI = async () => {
   const statusMsg = document.getElementById('aiStatusMsg');
   
   // DÁN CÁI LINK WEB APP (SCRIPT.GOOGLE.COM) MÀ ANH VỪA LẤY ĐƯỢC VÀO ĐÂY:
-  const scriptUrl = "DÁN_LINK_WEB_APP_CỦA_ANH_VÀO_ĐÂY"; 
+  const scriptUrl = "https://script.google.com/macros/s/AKfycbzcahuGuwKYRLTrKA7IrbJp1UCW2Z4RAVqFkWhkF5Z1Bwtol6-ymN-qGrDbD0giT6Pc/exec"; 
   
   if(!promptText && !window.aiAttachedImage) { 
       window.showToast("Anh nhập nội dung hoặc dán ảnh (Ctrl+V) vô trước đã nghen!", "error"); return; 
